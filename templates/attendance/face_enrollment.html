@@ -1,0 +1,257 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+
+{% block title %}Face Enrollment - {{ student.full_name }}{% endblock %}
+
+{% block page_header %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'student_list' %}">Students</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'student_detail' student.student_id %}">{{ student.full_name }}</a></li>
+                <li class="breadcrumb-item active">Face Enrollment</li>
+            </ol>
+        </nav>
+        <h1 class="h2 mb-4">
+            <i class="fas fa-camera me-2"></i>Face Enrollment - {{ student.full_name }}
+        </h1>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-camera me-2"></i>Capture Face Image
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Camera Section -->
+                <div class="text-center mb-4">
+                    <video id="video" width="400" height="300" autoplay class="border rounded"></video>
+                    <canvas id="canvas" width="400" height="300" style="display: none;"></canvas>
+                </div>
+                
+                <!-- Controls -->
+                <div class="text-center mb-4">
+                    <button id="startCamera" class="btn btn-primary me-2">
+                        <i class="fas fa-video me-1"></i>Start Camera
+                    </button>
+                    <button id="captureImage" class="btn btn-success me-2" disabled>
+                        <i class="fas fa-camera me-1"></i>Capture Image
+                    </button>
+                    <button id="retakeImage" class="btn btn-warning me-2" style="display: none;">
+                        <i class="fas fa-redo me-1"></i>Retake
+                    </button>
+                </div>
+                
+                <!-- Captured Image Preview -->
+                <div id="imagePreview" class="text-center mb-4" style="display: none;">
+                    <h6>Captured Image:</h6>
+                    <img id="capturedImage" class="border rounded" style="max-width: 300px;">
+                </div>
+                
+                <!-- Validation Status -->
+                <div id="validationStatus" class="alert" style="display: none;"></div>
+                
+                <!-- Enrollment Form -->
+                <form id="enrollmentForm" method="post" style="display: none;">
+                    {% csrf_token %}
+                    <input type="hidden" id="imageData" name="image_data">
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="isPrimary" name="is_primary" 
+                                   {% if existing_encodings == 0 %}checked{% endif %}>
+                            <label class="form-check-label" for="isPrimary">
+                                Set as primary face image
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-save me-2"></i>Enroll Face
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Student Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user me-2"></i>Student Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Student ID:</strong> {{ student.student_id }}</p>
+                <p><strong>Name:</strong> {{ student.full_name }}</p>
+                <p><strong>Email:</strong> {{ student.email }}</p>
+                <p><strong>Existing Encodings:</strong> {{ existing_encodings }}</p>
+            </div>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Instructions
+                </h5>
+            </div>
+            <div class="card-body">
+                <ol class="small">
+                    <li>Click "Start Camera" to begin</li>
+                    <li>Position your face in the center of the frame</li>
+                    <li>Ensure good lighting and clear visibility</li>
+                    <li>Click "Capture Image" when ready</li>
+                    <li>Review the captured image</li>
+                    <li>Click "Enroll Face" to save</li>
+                </ol>
+                
+                <div class="alert alert-info mt-3">
+                    <small>
+                        <i class="fas fa-lightbulb me-1"></i>
+                        <strong>Tips:</strong> Use good lighting, look directly at the camera, 
+                        and ensure only one face is visible in the frame.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let context = canvas.getContext('2d');
+let capturedImageData = null;
+
+// Start camera
+document.getElementById('startCamera').addEventListener('click', async function() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: 400, height: 300 } 
+        });
+        video.srcObject = stream;
+        
+        this.disabled = true;
+        document.getElementById('captureImage').disabled = false;
+        
+        // Show success message
+        showAlert('Camera started successfully!', 'success');
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        showAlert('Error accessing camera. Please check permissions.', 'danger');
+    }
+});
+
+// Capture image
+document.getElementById('captureImage').addEventListener('click', function() {
+    // Draw video frame to canvas
+    context.drawImage(video, 0, 0, 400, 300);
+    
+    // Get image data
+    capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // Show preview
+    document.getElementById('capturedImage').src = capturedImageData;
+    document.getElementById('imagePreview').style.display = 'block';
+    
+    // Show retake button
+    document.getElementById('retakeImage').style.display = 'inline-block';
+    this.disabled = true;
+    
+    // Validate image
+    validateImage(capturedImageData);
+});
+
+// Retake image
+document.getElementById('retakeImage').addEventListener('click', function() {
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('enrollmentForm').style.display = 'none';
+    document.getElementById('validationStatus').style.display = 'none';
+    document.getElementById('captureImage').disabled = false;
+    this.style.display = 'none';
+    capturedImageData = null;
+});
+
+// Validate image (client-side basic validation)
+function validateImage(imageData) {
+    try {
+        // Basic client-side validation
+        if (!imageData || imageData.length < 1000) {
+            showValidationStatus('Image data is too small. Please try again.', 'danger');
+            return;
+        }
+
+        // Check if it's a valid base64 image
+        if (!imageData.startsWith('data:image/')) {
+            showValidationStatus('Invalid image format. Please try again.', 'danger');
+            return;
+        }
+
+        // If basic validation passes, show success and enable form
+        showValidationStatus('Image captured successfully! You can now enroll the face.', 'success');
+        document.getElementById('imageData').value = capturedImageData;
+        document.getElementById('enrollmentForm').style.display = 'block';
+
+    } catch (error) {
+        console.error('Error validating image:', error);
+        showValidationStatus('Error validating image. Please try again.', 'danger');
+    }
+}
+
+// Show validation status
+function showValidationStatus(message, type) {
+    const statusDiv = document.getElementById('validationStatus');
+    statusDiv.className = `alert alert-${type}`;
+    statusDiv.innerHTML = `<i class="fas fa-${type === 'success' ? 'check' : 'exclamation-triangle'} me-2"></i>${message}`;
+    statusDiv.style.display = 'block';
+}
+
+// Show alert
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('main .container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// Form submission
+document.getElementById('enrollmentForm').addEventListener('submit', function(e) {
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Enrolling...';
+});
+</script>
+{% endblock %}
+
+
+
+
+
+
+

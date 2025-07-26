@@ -1,0 +1,246 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+
+{% block title %}{{ student.full_name }} - Student Details{% endblock %}
+
+{% block page_header %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'student_list' %}">Students</a></li>
+                <li class="breadcrumb-item active">{{ student.full_name }}</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h2 mb-4">
+                <i class="fas fa-user me-2"></i>{{ student.full_name }}
+            </h1>
+            <div>
+                <a href="{% url 'face_enrollment' student.student_id %}" class="btn btn-success">
+                    <i class="fas fa-camera me-1"></i>Enroll Face
+                </a>
+                <a href="/admin/attendance/student/{{ student.id }}/change/" class="btn btn-outline-primary">
+                    <i class="fas fa-edit me-1"></i>Edit
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Student Information -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Student Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless">
+                    <tr>
+                        <td><strong>Student ID:</strong></td>
+                        <td>{{ student.student_id }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Name:</strong></td>
+                        <td>{{ student.full_name }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Email:</strong></td>
+                        <td>{{ student.email }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Phone:</strong></td>
+                        <td>{{ student.phone|default:"Not provided" }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Status:</strong></td>
+                        <td>
+                            {% if student.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Registered:</strong></td>
+                        <td>{{ student.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Face Encodings -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-camera me-2"></i>Face Encodings
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if face_encodings %}
+                    {% for encoding in face_encodings %}
+                    <div class="d-flex align-items-center mb-3 p-2 border rounded">
+                        {% if encoding.image %}
+                            <img src="{{ encoding.image.url }}" alt="Face" class="rounded me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                        {% else %}
+                            <div class="bg-light rounded me-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                <i class="fas fa-user text-muted"></i>
+                            </div>
+                        {% endif %}
+                        <div class="flex-grow-1">
+                            <div>
+                                {% if encoding.is_primary %}
+                                    <span class="badge bg-primary">Primary</span>
+                                {% endif %}
+                                <small class="text-muted">{{ encoding.created_at|date:"M d, Y" }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No face encodings found</p>
+                        <a href="{% url 'face_enrollment' student.student_id %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-camera me-1"></i>Enroll First Face
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Enrolled Classes -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chalkboard me-2"></i>Enrolled Classes
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if student.enrolled_classes.all %}
+                    {% for class in student.enrolled_classes.all %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                        <div>
+                            <strong>{{ class.code }}</strong><br>
+                            <small class="text-muted">{{ class.name }}</small>
+                        </div>
+                        <div>
+                            <a href="{% url 'class_detail' class.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-chalkboard fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">Not enrolled in any classes</p>
+                        <a href="/admin/attendance/student/{{ student.id }}/change/" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i>Enroll in Classes
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Attendance -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2"></i>Recent Attendance
+                </h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                {% if recent_attendance %}
+                    {% for record in recent_attendance %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                        <div>
+                            <strong>{{ record.class_attended.code }}</strong><br>
+                            <small class="text-muted">{{ record.date }}</small>
+                        </div>
+                        <div class="text-end">
+                            {% if record.status == 'present' %}
+                                <span class="badge bg-success">Present</span>
+                            {% elif record.status == 'late' %}
+                                <span class="badge bg-warning">Late</span>
+                            {% else %}
+                                <span class="badge bg-danger">Absent</span>
+                            {% endif %}
+                            <br>
+                            <small class="text-muted">{{ record.timestamp|time:"H:i" }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No attendance records found</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>Attendance Statistics
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <h4 class="text-primary">{{ student.enrolled_classes.count }}</h4>
+                        <p class="text-muted mb-0">Enrolled Classes</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-success">{{ recent_attendance|length }}</h4>
+                        <p class="text-muted mb-0">Total Records</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-info">{{ face_encodings|length }}</h4>
+                        <p class="text-muted mb-0">Face Encodings</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-warning" id="attendanceRate">-</h4>
+                        <p class="text-muted mb-0">Attendance Rate</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Calculate attendance rate
+document.addEventListener('DOMContentLoaded', function() {
+    const attendanceRecords = document.querySelectorAll('.badge.bg-success');
+    const totalRecords = {{ recent_attendance|length }};
+    const presentCount = attendanceRecords.length;
+    
+    if (totalRecords > 0) {
+        const rate = Math.round((presentCount / totalRecords) * 100);
+        document.getElementById('attendanceRate').textContent = rate + '%';
+    } else {
+        document.getElementById('attendanceRate').textContent = 'N/A';
+    }
+});
+</script>
+{% endblock %}

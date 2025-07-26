@@ -1,0 +1,377 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+
+{% block title %}Take Attendance - {{ class.name }}{% endblock %}
+
+{% block page_header %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'class_list' %}">Classes</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'class_detail' class.id %}">{{ class.name }}</a></li>
+                <li class="breadcrumb-item active">Take Attendance</li>
+            </ol>
+        </nav>
+        <h1 class="h2 mb-4">
+            <i class="fas fa-user-check me-2"></i>Take Attendance - {{ class.name }}
+        </h1>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Face Recognition Section -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-camera me-2"></i>Face Recognition Attendance
+                </h5>
+                <div>
+                    <span class="badge bg-primary">{{ class.code }}</span>
+                    <span class="badge bg-info">{{ session.date }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Camera Section -->
+                <div class="text-center mb-4">
+                    <video id="video" width="480" height="360" autoplay class="border rounded"></video>
+                    <canvas id="canvas" width="480" height="360" style="display: none;"></canvas>
+                </div>
+                
+                <!-- Controls -->
+                <div class="text-center mb-4">
+                    <button id="startCamera" class="btn btn-primary btn-lg me-2">
+                        <i class="fas fa-video me-1"></i>Start Camera
+                    </button>
+                    <button id="recognizeFace" class="btn btn-success btn-lg me-2" disabled>
+                        <i class="fas fa-user-check me-1"></i>Recognize & Mark Attendance
+                    </button>
+                    <button id="stopCamera" class="btn btn-danger btn-lg" disabled>
+                        <i class="fas fa-stop me-1"></i>Stop Camera
+                    </button>
+                </div>
+                
+                <!-- Recognition Status -->
+                <div id="recognitionStatus" class="alert" style="display: none;"></div>
+                
+                <!-- Last Recognition Result -->
+                <div id="lastResult" class="card bg-light" style="display: none;">
+                    <div class="card-body">
+                        <h6 class="card-title">Last Recognition Result:</h6>
+                        <div id="resultContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Attendance Status -->
+    <div class="col-md-4">
+        <!-- Session Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Session Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Class:</strong> {{ class.name }}</p>
+                <p><strong>Code:</strong> {{ class.code }}</p>
+                <p><strong>Date:</strong> {{ session.date }}</p>
+                <p><strong>Total Students:</strong> {{ total_students }}</p>
+                <p><strong>Present:</strong> <span id="presentCount">{{ present_count }}</span></p>
+                <p><strong>Attendance Rate:</strong> 
+                    <span id="attendanceRate">
+                        {% if total_students > 0 %}
+                            {{ present_count|floatformat:0 }}/{{ total_students }} 
+                            ({% widthratio present_count total_students 100 %}%)
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+        
+        <!-- Present Students -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-users me-2"></i>Present Students
+                </h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <div id="presentStudentsList">
+                    {% for record in attendance_records %}
+                        {% if record.status == 'present' %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-success bg-opacity-10 rounded">
+                            <div>
+                                <strong>{{ record.student.full_name }}</strong><br>
+                                <small class="text-muted">{{ record.student.student_id }}</small>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-success">
+                                    <i class="fas fa-check-circle"></i>
+                                    {{ record.timestamp|time:"H:i" }}
+                                </small>
+                                {% if record.recognition_confidence %}
+                                <br><small class="text-muted">{{ record.recognition_confidence|floatformat:1 }}%</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% empty %}
+                    <p class="text-muted text-center">No students marked present yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Auto-refresh attendance status -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">Auto-refresh attendance status</h6>
+                        <small class="text-muted">Updates every 30 seconds</small>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                        <label class="form-check-label" for="autoRefresh">Enable</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let context = canvas.getContext('2d');
+let stream = null;
+let recognitionInProgress = false;
+let autoRefreshInterval = null;
+
+// Start camera
+document.getElementById('startCamera').addEventListener('click', async function() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: 480, height: 360 } 
+        });
+        video.srcObject = stream;
+        
+        this.disabled = true;
+        document.getElementById('recognizeFace').disabled = false;
+        document.getElementById('stopCamera').disabled = false;
+        
+        showStatus('Camera started successfully!', 'success');
+        
+        // Start auto-refresh
+        startAutoRefresh();
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        showStatus('Error accessing camera. Please check permissions.', 'danger');
+    }
+});
+
+// Stop camera
+document.getElementById('stopCamera').addEventListener('click', function() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+        stream = null;
+    }
+    
+    document.getElementById('startCamera').disabled = false;
+    document.getElementById('recognizeFace').disabled = true;
+    this.disabled = true;
+    
+    showStatus('Camera stopped.', 'info');
+    
+    // Stop auto-refresh
+    stopAutoRefresh();
+});
+
+// Recognize face
+document.getElementById('recognizeFace').addEventListener('click', async function() {
+    if (recognitionInProgress) return;
+    
+    recognitionInProgress = true;
+    const originalText = this.innerHTML;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Recognizing...';
+    this.disabled = true;
+    
+    try {
+        // Capture current frame
+        context.drawImage(video, 0, 0, 480, 360);
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // Send to recognition API
+        const response = await fetch('{% url "api_recognize_face" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                image_data: imageData,
+                class_id: {{ class.id }}
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showStatus(`✅ ${result.message}`, 'success');
+            showLastResult(result);
+            updateAttendanceStatus();
+        } else {
+            showStatus(`❌ ${result.message}`, 'warning');
+            if (result.student_name) {
+                showLastResult(result);
+            }
+        }
+    } catch (error) {
+        console.error('Error recognizing face:', error);
+        showStatus('Error processing recognition request.', 'danger');
+    } finally {
+        recognitionInProgress = false;
+        this.innerHTML = originalText;
+        this.disabled = false;
+    }
+});
+
+// Show status message
+function showStatus(message, type) {
+    const statusDiv = document.getElementById('recognitionStatus');
+    statusDiv.className = `alert alert-${type}`;
+    statusDiv.innerHTML = message;
+    statusDiv.style.display = 'block';
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        statusDiv.style.display = 'none';
+    }, 5000);
+}
+
+// Show last result
+function showLastResult(result) {
+    const resultDiv = document.getElementById('lastResult');
+    const contentDiv = document.getElementById('resultContent');
+    
+    let content = `
+        <p><strong>Student:</strong> ${result.student_name || 'Unknown'}</p>
+        <p><strong>Student ID:</strong> ${result.student_id || 'N/A'}</p>
+        <p><strong>Confidence:</strong> ${(result.confidence * 100).toFixed(1)}%</p>
+        <p><strong>Status:</strong> ${result.success ? 'Present' : 'Not Recognized'}</p>
+    `;
+    
+    if (result.timestamp) {
+        content += `<p><strong>Time:</strong> ${new Date(result.timestamp).toLocaleTimeString()}</p>`;
+    }
+    
+    contentDiv.innerHTML = content;
+    resultDiv.style.display = 'block';
+}
+
+// Update attendance status
+async function updateAttendanceStatus() {
+    try {
+        const response = await fetch('{% url "api_attendance_status" class.id %}');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('presentCount').textContent = data.present_count;
+            document.getElementById('attendanceRate').textContent = 
+                `${data.present_count}/${data.total_students} (${data.attendance_rate}%)`;
+            
+            // Update present students list
+            updatePresentStudentsList(data.present_students);
+        }
+    } catch (error) {
+        console.error('Error updating attendance status:', error);
+    }
+}
+
+// Update present students list
+function updatePresentStudentsList(students) {
+    const listDiv = document.getElementById('presentStudentsList');
+    
+    if (students.length === 0) {
+        listDiv.innerHTML = '<p class="text-muted text-center">No students marked present yet.</p>';
+        return;
+    }
+    
+    let html = '';
+    students.forEach(student => {
+        const time = new Date(student.timestamp).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        html += `
+            <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-success bg-opacity-10 rounded">
+                <div>
+                    <strong>${student.name}</strong><br>
+                    <small class="text-muted">${student.student_id}</small>
+                </div>
+                <div class="text-end">
+                    <small class="text-success">
+                        <i class="fas fa-check-circle"></i>
+                        ${time}
+                    </small>
+                    ${student.confidence ? `<br><small class="text-muted">${(student.confidence * 100).toFixed(1)}%</small>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    listDiv.innerHTML = html;
+}
+
+// Auto-refresh functionality
+function startAutoRefresh() {
+    if (document.getElementById('autoRefresh').checked) {
+        autoRefreshInterval = setInterval(updateAttendanceStatus, 30000);
+    }
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+// Auto-refresh toggle
+document.getElementById('autoRefresh').addEventListener('change', function() {
+    if (this.checked) {
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
+});
+
+// Add CSRF token to all requests
+const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+if (!csrfToken) {
+    // Create CSRF token input if it doesn't exist
+    const tokenInput = document.createElement('input');
+    tokenInput.type = 'hidden';
+    tokenInput.name = 'csrfmiddlewaretoken';
+    tokenInput.value = '{{ csrf_token }}';
+    document.body.appendChild(tokenInput);
+}
+</script>
+{% endblock %}
