@@ -5,51 +5,75 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard - AI Attendance System</title>
-    
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
     <style>
         body {
-            background-color: #f8f9fa;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+
+        .sidebar {
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            min-height: 100vh;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
         }
-        
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s ease;
+
+        .sidebar .nav-link {
+            color: #ecf0f1;
+            padding: 15px 20px;
+            border-radius: 0;
+            transition: all 0.3s ease;
         }
-        
-        .card:hover {
-            transform: translateY(-5px);
+
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+            border-left: 4px solid #3498db;
         }
-        
-        .class-card {
+
+        .main-content {
+            background: white;
+            min-height: 100vh;
+            border-radius: 20px 0 0 20px;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+        }
+
+        .stats-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            cursor: pointer;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-        
-        .class-card:hover {
+
+        .class-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .class-card.enrolled {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .class-card.enrolled:hover {
             background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
         }
-        
+
         .attendance-status {
             position: absolute;
             top: 15px;
             right: 15px;
             font-size: 1.2rem;
         }
-        
+
         .btn-attendance {
             background: rgba(255, 255, 255, 0.2);
             border: 2px solid rgba(255, 255, 255, 0.3);
@@ -57,258 +81,373 @@
             border-radius: 10px;
             transition: all 0.2s ease;
         }
-        
+
         .btn-attendance:hover {
             background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.5);
             color: white;
         }
-        
-        .stats-card {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            text-align: center;
-            padding: 1.5rem;
+
+        .available-class-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border-left: 4px solid #28a745;
         }
-        
-        .welcome-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+        .available-class-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.2);
+        }
+
+        .attendance-badge {
+            background: rgba(255, 255, 255, 0.2);
             color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container">
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-user-graduate me-2"></i>Student Portal
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user me-1"></i>{{ student.full_name }}
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#profileModal">
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 px-0">
+                <div class="sidebar">
+                    <div class="p-4 text-center border-bottom border-secondary">
+                        <i class="fas fa-user-graduate fa-3x text-primary mb-3"></i>
+                        <h5 class="text-white mb-0">Student Portal</h5>
+                        <small class="text-muted">{{ student.get_full_name|default:user.username }}</small>
+                    </div>
+
+                    <nav class="nav flex-column">
+                        <a class="nav-link active" href="{% url 'student_dashboard' %}">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        </a>
+                        <a class="nav-link" href="#classes">
+                            <i class="fas fa-chalkboard me-2"></i>My Classes
+                        </a>
+                        <a class="nav-link" href="{% url 'student_attendance_history' %}">
+                            <i class="fas fa-calendar-check me-2"></i>Attendance
+                        </a>
+                        <a class="nav-link" href="{% url 'student_face_enrollment' %}">
+                            <i class="fas fa-camera me-2"></i>Face Registration
+                        </a>
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#profileModal">
                             <i class="fas fa-user me-2"></i>Profile
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{% url 'student_logout' %}">
-                            <i class="fas fa-sign-out-alt me-2"></i>Logout
-                        </a></li>
-                    </ul>
+                        </a>
+                        <div class="border-top border-secondary mt-3 pt-3">
+                            <a class="nav-link" href="{% url 'student_logout' %}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a>
+                        </div>
+                    </nav>
                 </div>
             </div>
-        </div>
-    </nav>
 
-    <div class="container mt-4">
-        <!-- Messages -->
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-
-        <!-- Welcome Card -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card welcome-card">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-md-8">
-                                <h2 class="card-title mb-2">
-                                    <i class="fas fa-sun me-2"></i>Welcome back, {{ student.first_name }}!
-                                </h2>
-                                <p class="card-text mb-0">
-                                    Ready to mark your attendance? Select a class below and use face recognition.
-                                </p>
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 px-0">
+                <div class="main-content p-4">
+                    <!-- Messages -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                             </div>
-                            <div class="col-md-4 text-end">
-                                <div class="stats-card rounded">
-                                    <h4 class="mb-1">{{ today|date:"M d, Y" }}</h4>
-                                    <small>Today's Date</small>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- Header -->
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h2 class="mb-1">
+                                <i class="fas fa-sun me-2 text-warning"></i>Good day, {{ student.get_full_name|default:user.username }}!
+                            </h2>
+                            <p class="text-muted mb-0">View your enrolled classes and attendance history below.</p>
+                        </div>
+                        <div class="text-end">
+                            <h4 class="mb-0">{{ today|date:"M d, Y" }}</h4>
+                            <small class="text-muted">{{ today|date:"l" }}</small>
+                        </div>
+                    </div>
+
+                    <!-- Face Registration Alert -->
+                    {% if student.face_encodings.count == 0 %}
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Face Not Registered!</strong> Register your face so lecturers can mark your attendance using face recognition.
+                            </div>
+                            <a href="{% url 'student_face_enrollment' %}" class="btn btn-info btn-sm">
+                                <i class="fas fa-camera me-1"></i>Register Face
+                            </a>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endif %}
+
+                    <!-- Statistics Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="stats-card">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h3 class="mb-0">{{ classes_with_attendance|length }}</h3>
+                                        <p class="mb-0">Enrolled Classes</p>
+                                    </div>
+                                    <i class="fas fa-chalkboard fa-2x opacity-75"></i>
                                 </div>
                             </div>
                         </div>
+                        <div class="col-md-4">
+                            <div class="stats-card">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h3 class="mb-0">{{ today_attendance_count|default:0 }}</h3>
+                                        <p class="mb-0">Today's Attendance</p>
+                                    </div>
+                                    <i class="fas fa-calendar-check fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stats-card">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h3 class="mb-0">
+                                            {% if student.face_encodings.count > 0 %}
+                                                <i class="fas fa-check text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-times text-danger"></i>
+                                            {% endif %}
+                                        </h3>
+                                        <p class="mb-0">Face Registration</p>
+                                    </div>
+                                    <i class="fas fa-camera fa-2x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- Face Registration Status -->
-                        {% if student.face_encodings.count == 0 %}
-                        <div class="row mt-3">
-                            <div class="col-12">
-                                <div class="alert alert-warning">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <i class="fas fa-exclamation-triangle me-2"></i>
-                                            <strong>Face Not Registered!</strong> You need to register your face to mark attendance.
+                    <!-- Classes Section -->
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h3 class="mb-0">
+                            <i class="fas fa-chalkboard me-2"></i>Your Classes
+                        </h3>
+                    </div>
+
+                    {% if classes_with_attendance %}
+                        <div class="row">
+                            {% for item in classes_with_attendance %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="card class-card enrolled position-relative">
+                                        <!-- Attendance Status Icon -->
+                                        <div class="attendance-status">
+                                            {% if item.is_marked %}
+                                                {% if item.attendance.status == 'present' %}
+                                                    <i class="fas fa-check-circle text-success" title="Present"></i>
+                                                {% elif item.attendance.status == 'late' %}
+                                                    <i class="fas fa-clock text-warning" title="Late"></i>
+                                                {% else %}
+                                                    <i class="fas fa-times-circle text-danger" title="Absent"></i>
+                                                {% endif %}
+                                            {% else %}
+                                                <i class="fas fa-question-circle text-light" title="Not marked"></i>
+                                            {% endif %}
                                         </div>
-                                        <a href="{% url 'student_face_enrollment' %}" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-camera me-1"></i>Register Face
+
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                                <h5 class="card-title mb-0">{{ item.class.code }}</h5>
+                                                <span class="attendance-badge">
+                                                    {% if item.is_marked %}
+                                                        {% if item.attendance.status == 'present' %}
+                                                            Present
+                                                        {% elif item.attendance.status == 'late' %}
+                                                            Late
+                                                        {% else %}
+                                                            Absent
+                                                        {% endif %}
+                                                    {% else %}
+                                                        Pending
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+
+                                            <h6 class="card-subtitle mb-3 opacity-75">{{ item.class.name }}</h6>
+
+                                            {% if item.class.description %}
+                                                <p class="card-text small opacity-75 mb-3">{{ item.class.description|truncatewords:10 }}</p>
+                                            {% endif %}
+
+                                            <div class="mb-3">
+                                                <small class="opacity-75">
+                                                    <i class="fas fa-user-tie me-1"></i>
+                                                    {{ item.class.instructor.get_full_name|default:item.class.instructor.username }}
+                                                </small>
+                                            </div>
+
+                                            {% if item.is_marked %}
+                                                <div class="mb-3">
+                                                    <small class="opacity-75">
+                                                        <i class="fas fa-clock me-1"></i>
+                                                        Marked at {{ item.attendance.timestamp|time:"H:i" }}
+                                                    </small>
+                                                </div>
+                                                <div class="btn btn-attendance w-100" style="background: rgba(40, 167, 69, 0.8);">
+                                                    <i class="fas fa-check me-2"></i>Attended
+                                                </div>
+                                            {% else %}
+                                                <div class="text-center bg-light p-3 rounded-3">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-info-circle me-1"></i>
+                                                        Attendance will be marked by your lecturer
+                                                    </small>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-body text-center py-5">
+                                        <i class="fas fa-chalkboard fa-3x text-muted mb-4"></i>
+                                        <h4 class="text-muted mb-3">No Classes Enrolled</h4>
+                                        <p class="text-muted mb-4">You are not enrolled in any classes yet.</p>
+
+                                        <div class="alert alert-info text-start">
+                                            <h6 class="alert-heading">
+                                                <i class="fas fa-info-circle me-2"></i>How to get enrolled:
+                                            </h6>
+                                            <ol class="mb-0">
+                                                <li><strong>Contact your instructor</strong> - Ask them to enroll you in their classes</li>
+                                                <li><strong>Visit the admin office</strong> - They can enroll you in the appropriate classes</li>
+                                                <li><strong>Check with your academic advisor</strong> - They can help with course registration</li>
+                                            </ol>
+                                        </div>
+
+                                        <div class="mt-4">
+                                            <p class="small text-muted">
+                                                <i class="fas fa-user-tie me-1"></i>
+                                                Student ID: <strong>{{ student.student_id }}</strong> |
+                                                Email: <strong>{{ student.email }}</strong>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <!-- Available Classes for Enrollment -->
+                    {% if available_classes %}
+                    <div class="d-flex justify-content-between align-items-center mb-4 mt-5">
+                        <h3 class="mb-0">
+                            <i class="fas fa-plus-circle me-2"></i>Available Classes
+                        </h3>
+                        <small class="text-muted">Click to enroll</small>
+                    </div>
+
+                    <div class="row">
+                        {% for class in available_classes %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card available-class-card">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <h5 class="card-title mb-0">{{ class.code }}</h5>
+                                        <span class="badge bg-success">Available</span>
+                                    </div>
+
+                                    <h6 class="card-subtitle mb-3 text-muted">{{ class.name }}</h6>
+
+                                    {% if class.description %}
+                                        <p class="card-text small text-muted mb-3">{{ class.description|truncatewords:15 }}</p>
+                                    {% endif %}
+
+                                    <div class="mb-3">
+                                        <small class="text-muted">
+                                            <i class="fas fa-user-tie me-1"></i>
+                                            {{ class.instructor.get_full_name|default:class.instructor.username }}
+                                        </small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <small class="text-muted">
+                                            <i class="fas fa-users me-1"></i>
+                                            {{ class.students.count }} students enrolled
+                                        </small>
+                                    </div>
+
+                                    <div class="d-grid">
+                                        <a href="{% url 'enroll_in_class' class.id %}" class="btn btn-success">
+                                            <i class="fas fa-plus me-2"></i>Enroll in Class
                                         </a>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        {% endif %}
-                        </div>
+                        {% endfor %}
                     </div>
-                </div>
-            </div>
-        </div>
+                    {% endif %}
 
-        <!-- Classes Section -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <h3 class="mb-3">
-                    <i class="fas fa-chalkboard me-2"></i>Your Classes
-                </h3>
-            </div>
-        </div>
-
-        {% if classes_with_attendance %}
-            <div class="row">
-                {% for item in classes_with_attendance %}
-                <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card class-card position-relative" onclick="markAttendance({{ item.class.id }})">
-                        <!-- Attendance Status Icon -->
-                        <div class="attendance-status">
-                            {% if item.is_marked %}
-                                {% if item.attendance.status == 'present' %}
-                                    <i class="fas fa-check-circle text-success" title="Present"></i>
-                                {% elif item.attendance.status == 'late' %}
-                                    <i class="fas fa-clock text-warning" title="Late"></i>
-                                {% else %}
-                                    <i class="fas fa-times-circle text-danger" title="Absent"></i>
-                                {% endif %}
-                            {% else %}
-                                <i class="fas fa-question-circle text-light" title="Not marked"></i>
-                            {% endif %}
-                        </div>
-
-                        <div class="card-body">
-                            <h5 class="card-title">{{ item.class.code }}</h5>
-                            <h6 class="card-subtitle mb-3 opacity-75">{{ item.class.name }}</h6>
-
-                            {% if item.class.description %}
-                                <p class="card-text small opacity-75">{{ item.class.description|truncatewords:10 }}</p>
-                            {% endif %}
-
-                            <div class="mb-3">
-                                <small class="opacity-75">
-                                    <i class="fas fa-user-tie me-1"></i>
-                                    {{ item.class.instructor.get_full_name|default:item.class.instructor.username }}
-                                </small>
-                            </div>
-
-                            {% if item.is_marked %}
-                                <div class="alert alert-success mb-3" style="background: rgba(255, 255, 255, 0.2); border: none;">
-                                    <small>
-                                        <i class="fas fa-check me-1"></i>
-                                        Attendance marked at {{ item.attendance.timestamp|time:"H:i" }}
-                                    </small>
-                                </div>
-                                <div class="btn btn-attendance w-100" style="background: rgba(40, 167, 69, 0.8);">
-                                    <i class="fas fa-check me-2"></i>Attended
-                                </div>
-                            {% else %}
-                                <div class="btn btn-attendance w-100" style="background: rgba(255, 193, 7, 0.8);">
-                                    <i class="fas fa-clock me-2"></i>Pending
-                                </div>
-                                <small class="text-white-50 mt-2 d-block">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    Use face recognition in class with your lecturer
-                                </small>
-                            {% endif %}
-                        </div>
+                    <!-- Recent Attendance -->
+                    {% if recent_attendance %}
+                    <div class="d-flex justify-content-between align-items-center mb-4 mt-5">
+                        <h3 class="mb-0">
+                            <i class="fas fa-history me-2"></i>Recent Attendance
+                        </h3>
                     </div>
-                </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="row">
-                <div class="col-12">
+
                     <div class="card">
-                        <div class="card-body text-center py-5">
-                            <i class="fas fa-chalkboard fa-3x text-muted mb-4"></i>
-                            <h4 class="text-muted mb-3">No Classes Enrolled</h4>
-                            <p class="text-muted mb-4">You are not enrolled in any classes yet.</p>
-
-                            <div class="alert alert-info text-start">
-                                <h6 class="alert-heading">
-                                    <i class="fas fa-info-circle me-2"></i>How to get enrolled:
-                                </h6>
-                                <ol class="mb-0">
-                                    <li><strong>Contact your instructor</strong> - Ask them to enroll you in their classes</li>
-                                    <li><strong>Visit the admin office</strong> - They can enroll you in the appropriate classes</li>
-                                    <li><strong>Check with your academic advisor</strong> - They can help with course registration</li>
-                                </ol>
-                            </div>
-
-                            <div class="mt-4">
-                                <p class="small text-muted">
-                                    <i class="fas fa-user-tie me-1"></i>
-                                    Student ID: <strong>{{ student.student_id }}</strong> |
-                                    Email: <strong>{{ student.email }}</strong>
-                                </p>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Class</th>
+                                            <th>Date</th>
+                                            <th>Time</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for record in recent_attendance %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ record.class_attended.code }}</strong><br>
+                                                <small class="text-muted">{{ record.class_attended.name }}</small>
+                                            </td>
+                                            <td>{{ record.date|date:"M d, Y" }}</td>
+                                            <td>{{ record.timestamp|time:"H:i" }}</td>
+                                            <td>
+                                                {% if record.status == 'present' %}
+                                                    <span class="badge bg-success">Present</span>
+                                                {% elif record.status == 'late' %}
+                                                    <span class="badge bg-warning">Late</span>
+                                                {% else %}
+                                                    <span class="badge bg-danger">Absent</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Recent Attendance -->
-        {% if recent_attendance %}
-        <div class="row mt-5">
-            <div class="col-12">
-                <h3 class="mb-3">
-                    <i class="fas fa-history me-2"></i>Recent Attendance
-                </h3>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Class</th>
-                                        <th>Date</th>
-                                        <th>Time</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for record in recent_attendance %}
-                                    <tr>
-                                        <td>
-                                            <strong>{{ record.class_attended.code }}</strong><br>
-                                            <small class="text-muted">{{ record.class_attended.name }}</small>
-                                        </td>
-                                        <td>{{ record.date|date:"M d, Y" }}</td>
-                                        <td>{{ record.timestamp|time:"H:i" }}</td>
-                                        <td>
-                                            {% if record.status == 'present' %}
-                                                <span class="badge bg-success">Present</span>
-                                            {% elif record.status == 'late' %}
-                                                <span class="badge bg-warning">Late</span>
-                                            {% else %}
-                                                <span class="badge bg-danger">Absent</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
-        {% endif %}
     </div>
 
     <!-- Profile Modal -->
@@ -322,38 +461,53 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="row">
+                        <div class="col-12 text-center mb-4">
+                            <i class="fas fa-user-graduate fa-4x text-primary mb-3"></i>
+                            <h4>{{ student.get_full_name|default:user.username }}</h4>
+                            <p class="text-muted">Student Profile</p>
+                        </div>
+                    </div>
                     <table class="table table-borderless">
                         <tr>
-                            <td><strong>Student ID:</strong></td>
+                            <td><strong><i class="fas fa-id-card me-2"></i>Student ID:</strong></td>
                             <td>{{ student.student_id }}</td>
                         </tr>
                         <tr>
-                            <td><strong>Name:</strong></td>
-                            <td>{{ student.full_name }}</td>
+                            <td><strong><i class="fas fa-user me-2"></i>Name:</strong></td>
+                            <td>{{ student.get_full_name|default:user.username }}</td>
                         </tr>
                         <tr>
-                            <td><strong>Email:</strong></td>
+                            <td><strong><i class="fas fa-envelope me-2"></i>Email:</strong></td>
                             <td>{{ student.email }}</td>
                         </tr>
                         <tr>
-                            <td><strong>Phone:</strong></td>
+                            <td><strong><i class="fas fa-phone me-2"></i>Phone:</strong></td>
                             <td>{{ student.phone|default:"Not provided" }}</td>
                         </tr>
                         <tr>
-                            <td><strong>Enrolled Classes:</strong></td>
-                            <td>{{ enrolled_classes|length }}</td>
+                            <td><strong><i class="fas fa-chalkboard me-2"></i>Enrolled Classes:</strong></td>
+                            <td>{{ classes_with_attendance|length }}</td>
                         </tr>
                         <tr>
-                            <td><strong>Face Enrolled:</strong></td>
+                            <td><strong><i class="fas fa-camera me-2"></i>Face Registration:</strong></td>
                             <td>
                                 {% if student.face_encodings.count > 0 %}
-                                    <span class="badge bg-success">Yes</span>
+                                    <span class="badge bg-success"><i class="fas fa-check me-1"></i>Registered</span>
                                 {% else %}
-                                    <span class="badge bg-warning">No</span>
+                                    <span class="badge bg-warning"><i class="fas fa-exclamation-triangle me-1"></i>Not Registered</span>
                                 {% endif %}
                             </td>
                         </tr>
                     </table>
+                </div>
+                <div class="modal-footer">
+                    {% if student.face_encodings.count == 0 %}
+                    <a href="{% url 'student_face_enrollment' %}" class="btn btn-primary">
+                        <i class="fas fa-camera me-2"></i>Register Face
+                    </a>
+                    {% endif %}
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -361,33 +515,20 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <script>
-        function markAttendance(classId) {
-            // Check if attendance already marked
-            const card = event.currentTarget;
-            const button = card.querySelector('button');
-
-            if (button.disabled) {
-                return; // Already marked
-            }
-
-            // Check if face is registered
-            {% if student.face_encodings.count == 0 %}
-                if (confirm('You need to register your face first. Would you like to register now?')) {
-                    window.location.href = '{% url "student_face_enrollment" %}';
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
                 }
-                return;
-            {% endif %}
-
-            // Redirect to attendance marking page
-            window.location.href = `/mark-attendance/${classId}/`;
-        }
-        
-        // Add template filter for dictionary lookup
-        function lookup(dict, key) {
-            return dict[key];
-        }
+            });
+        });
     </script>
 </body>
 </html>

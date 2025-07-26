@@ -214,33 +214,40 @@
                         <!-- Student List Section -->
                         <div class="col-md-4">
                             <h5 class="mb-3">
-                                <i class="fas fa-users me-2"></i>Student Attendance
+                                <i class="fas fa-users me-2"></i>Enrolled Students
                                 <span class="badge bg-primary ms-2">{{ today_attendance.count }}/{{ enrolled_students.count }}</span>
                             </h5>
-                            
-                            <div style="max-height: 600px; overflow-y: auto;">
-                                {% for status in attendance_status %}
-                                    <div class="card student-card {% if status.is_marked %}status-present{% else %}status-pending{% endif %}">
-                                        <div class="card-body py-2">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <h6 class="mb-0">{{ status.student.full_name }}</h6>
-                                                    <small class="opacity-75">{{ status.student.student_id }}</small>
-                                                </div>
-                                                <div class="text-end">
-                                                    {% if status.is_marked %}
-                                                        <i class="fas fa-check-circle fa-lg"></i>
-                                                        <br><small>{{ status.attendance.timestamp|time:"H:i" }}</small>
-                                                    {% else %}
-                                                        <i class="fas fa-clock fa-lg"></i>
-                                                        <br><small>Pending</small>
-                                                    {% endif %}
+
+                            {% if enrolled_students.count == 0 %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    No students enrolled in this class yet.
+                                </div>
+                            {% else %}
+                                <div style="max-height: 600px; overflow-y: auto;">
+                                    {% for status in attendance_status %}
+                                        <div class="card student-card {% if status.is_marked %}status-present{% else %}status-pending{% endif %}">
+                                            <div class="card-body py-2">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <h6 class="mb-0">{{ status.student.full_name }}</h6>
+                                                        <small class="opacity-75">{{ status.student.student_id }}</small>
+                                                    </div>
+                                                    <div class="text-end">
+                                                        {% if status.is_marked %}
+                                                            <i class="fas fa-check-circle fa-lg"></i>
+                                                            <br><small>{{ status.attendance.timestamp|date:"M d" }} at {{ status.attendance.timestamp|time:"H:i" }}</small>
+                                                        {% else %}
+                                                            <i class="fas fa-clock fa-lg"></i>
+                                                            <br><small>Pending</small>
+                                                        {% endif %}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                             
                             <!-- Back to Dashboard -->
                             <div class="text-center mt-4">

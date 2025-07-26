@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.db import transaction
 from django import forms
-from .models import CustomUser, Student, Lecturer, Class, Attendance, FaceEncoding, AttendanceSession
+from .models import CustomUser, Student, Lecturer, Class, Attendance, FaceEncoding, AttendanceSession, Department, Level
 
 User = get_user_model()
 
@@ -35,11 +35,17 @@ class CustomUserCreationForm(forms.ModelForm):
         return user
 
 
+
+
 class CustomUserChangeForm(forms.ModelForm):
     """Custom user change form"""
     class Meta:
         model = User
         fields = '__all__'
+
+
+
+
 
 
 @admin.register(CustomUser)
@@ -72,6 +78,8 @@ class CustomUserAdmin(BaseUserAdmin):
     )
 
 
+
+
 @admin.register(Lecturer)
 class LecturerAdmin(admin.ModelAdmin):
     """Admin for Lecturer model"""
@@ -92,13 +100,22 @@ class LecturerAdmin(admin.ModelAdmin):
     )
 
 
+admin.site.register(Department)
 
+
+@admin.register(Level)
+class LevelAdmin(admin.ModelAdmin):
+    """Admin for Level model"""
+    list_display = ['name', 'code', 'description', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['name', 'code']
+    readonly_fields = ['created_at']
 
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ['student_id', 'user', 'enrolled_classes_count', 'face_encodings_count', 'is_active', 'created_at']
-    list_filter = ['is_active', 'created_at', 'enrolled_classes', 'major', 'year_of_study']
+    list_display = ['student_id', 'user', 'department', 'level', 'semester', 'enrolled_classes_count', 'face_encodings_count', 'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at', 'enrolled_classes', 'department', 'level', 'semester', 'year_of_study']
     search_fields = ['student_id', 'user__first_name', 'user__last_name', 'user__email']
     readonly_fields = ['created_at']
     filter_horizontal = ['enrolled_classes']
@@ -108,7 +125,7 @@ class StudentAdmin(admin.ModelAdmin):
             'fields': ('user',)
         }),
         ('Student Details', {
-            'fields': ('student_id', 'major', 'year_of_study')
+            'fields': ('student_id', 'department', 'level', 'semester', 'year_of_study')
         }),
         ('Enrollment', {
             'fields': ('enrolled_classes',)

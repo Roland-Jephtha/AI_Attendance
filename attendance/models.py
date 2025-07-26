@@ -55,6 +55,36 @@ class CustomUser(AbstractUser):
 
 
 
+class Department(models.Model):
+    """Model for departments"""
+    name = models.CharField(max_length=100, unique=True, null = True)
+    description = models.TextField(blank=True, null = True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name_plural = "Departments"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Level(models.Model):
+    """Model for academic levels (e.g., 100, 200, 300, 400)"""
+    name = models.CharField(max_length=50, unique=True)  # e.g., "100 Level", "200 Level"
+    code = models.CharField(max_length=10, unique=True)  # e.g., "100", "200"
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['code']
+
+    def __str__(self):
+        return self.name
+
+
+
+
 class Lecturer(models.Model):
     """Model for lecturer-specific information"""
     user = models.OneToOneField('CustomUser', on_delete=models.CASCADE, related_name='lecturer_profile')
@@ -92,11 +122,19 @@ class Class(models.Model):
 
 class Student(models.Model):
     """Model for student-specific information"""
+    SEMESTER_CHOICES = [
+        ('1', 'First Semester'),
+        ('2', 'Second Semester'),
+    ]
+
     user = models.OneToOneField('CustomUser', on_delete=models.CASCADE, related_name='student_profile', null = True)
     student_id = models.CharField(max_length=20, unique=True)
     enrolled_classes = models.ManyToManyField(Class, related_name='students', blank=True)
     year_of_study = models.CharField(max_length=20, blank=True)
-    major = models.CharField(max_length=100, blank=True)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='students', null=True, blank=True)
+    level = models.ForeignKey(Level, on_delete=models.CASCADE, related_name='students', null=True, blank=True)
+    semester = models.CharField(max_length=1, choices=SEMESTER_CHOICES, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
 

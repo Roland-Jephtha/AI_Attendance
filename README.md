@@ -62,11 +62,11 @@ A facial recognition-based attendance system built with Django and DeepFace. Stu
    - Capture clear image
    - Complete registration
 
-3. **Mark Attendance**:
+3. **View Classes & Attendance**:
    - Log in to student dashboard
-   - Select a class
-   - Use face recognition to mark attendance
-   - View attendance history
+   - View enrolled classes
+   - Check attendance history
+   - Attendance is marked by lecturers using face recognition
 
 ### For Administrators
 

@@ -15,12 +15,15 @@ urlpatterns = [
 
     # Lecturer Dashboard
     path('lecturer/dashboard/', views.lecturer_dashboard, name='lecturer_dashboard'),
+    path('lecturer/attendance-history/', views.lecturer_attendance_history, name='lecturer_attendance_history'),
     path('lecturer/attendance/<int:class_id>/', views.lecturer_attendance_session, name='lecturer_attendance_session'),
 
     # Student Dashboard
     path('dashboard/', views.student_dashboard, name='student_dashboard'),
+    path('attendance-history/', views.student_attendance_history, name='student_attendance_history'),
     path('enroll-face/', views.student_face_enrollment, name='student_face_enrollment'),
-    path('mark-attendance/<int:class_id>/', views.student_mark_attendance, name='student_mark_attendance'),
+    path('enroll-class/<int:class_id>/', views.enroll_in_class, name='enroll_in_class'),
+    path('unenroll-class/<int:class_id>/', views.unenroll_from_class, name='unenroll_from_class'),
 
     # Admin URLs (for staff/instructors)
     path('admin-dashboard/', views.dashboard, name='admin_dashboard'),

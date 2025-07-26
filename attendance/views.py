@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Q
 from django.core.paginator import Paginator
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -14,7 +15,7 @@ from rest_framework import status
 import json
 import logging
 
-from .models import CustomUser, Student, Lecturer, Class, Attendance, FaceEncoding, AttendanceSession
+from .models import CustomUser, Student, Lecturer, Class, Attendance, FaceEncoding, AttendanceSession, Department, Level
 
 # Get the custom user model
 User = get_user_model()
@@ -106,6 +107,9 @@ def student_signup(request):
             phone = request.POST.get('phone', '').strip()
             password = request.POST.get('password', '')
             confirm_password = request.POST.get('confirm_password', '')
+            department_id = request.POST.get('department', '')
+            level_id = request.POST.get('level', '')
+            semester = request.POST.get('semester', '')
 
             print(f"📝 Form Data Received:")
             print(f"   Student ID: '{student_id}'")
@@ -180,7 +184,30 @@ def student_signup(request):
 
             # Fetch the student profile created by the signal
             student = Student.objects.get(user=user)
-            print(f"✅ Student record created with ID: {student.id}")
+
+            # Update student with additional information
+            if department_id:
+                try:
+                    department = Department.objects.get(id=department_id)
+                    student.department = department
+                except Department.DoesNotExist:
+                    pass
+
+            if level_id:
+                try:
+                    level = Level.objects.get(id=level_id)
+                    student.level = level
+                except Level.DoesNotExist:
+                    pass
+
+            if semester:
+                student.semester = semester
+
+            if phone:
+                student.phone = phone
+
+            student.save()
+            print(f"✅ Student record updated with ID: {student.id}")
 
             # Login user using email
             auth_user = authenticate(request, username=email, password=password)
@@ -204,7 +231,17 @@ def student_signup(request):
             return render(request, 'attendance/student_signup.html')
     else:
         print("📄 SIGNUP: Showing signup form (GET request)")
-        return render(request, 'attendance/student_signup.html')
+        # Get departments and levels for dropdowns
+        departments = Department.objects.all().order_by('name')
+        levels = Level.objects.all().order_by('code')
+        semester_choices = Student.SEMESTER_CHOICES
+
+        context = {
+            'departments': departments,
+            'levels': levels,
+            'semester_choices': semester_choices,
+        }
+        return render(request, 'attendance/student_signup.html', context)
 
 
 def signup_success(request):
@@ -372,6 +409,15 @@ def lecturer_dashboard(request):
             date=today
         ).select_related('class_session')
 
+        # Add today's attendance count to each class
+        for cls in lecturer_classes:
+            today_attendance = Attendance.objects.filter(
+                class_attended=cls,
+                date=today,
+                status='present'
+            ).count()
+            cls.attendance_today_count = today_attendance
+
         # Get recent attendance records
         recent_attendance = Attendance.objects.filter(
             class_attended__instructor=request.user
@@ -396,12 +442,12 @@ def lecturer_dashboard(request):
 
     except Exception as e:
         messages.error(request, f'Error loading dashboard: {str(e)}')
-        return redirect('login')
+        return redirect('student_login')
 
 
 @login_required
 def student_dashboard(request):
-    """Student dashboard view - shows classes they can mark attendance for"""
+    """Student dashboard view - shows enrolled classes and attendance history"""
     try:
         # Get the student record for the logged-in user
         student = Student.objects.get(student_id=request.user.username, is_active=True)
@@ -429,24 +475,293 @@ def student_dashboard(request):
                 'is_marked': class_obj.id in marked_class_ids
             })
 
+        # Get available classes for enrollment (not already enrolled)
+        enrolled_class_ids = student.enrolled_classes.values_list('id', flat=True)
+        available_classes = Class.objects.filter(
+            is_active=True
+        ).exclude(id__in=enrolled_class_ids)
+
         # Get recent attendance history
         recent_attendance = Attendance.objects.filter(
             student=student
         ).select_related('class_attended').order_by('-timestamp')[:10]
 
+        # Calculate statistics
+        total_enrolled = enrolled_classes.count()
+        attended_today = len(marked_class_ids)
+
         context = {
             'student': student,
             'enrolled_classes': enrolled_classes,
+            'available_classes': available_classes,
             'classes_with_attendance': classes_with_attendance,
             'marked_class_ids': marked_class_ids,
             'recent_attendance': recent_attendance,
             'today': today,
+            'total_enrolled': total_enrolled,
+            'attended_today': attended_today,
         }
         return render(request, 'attendance/student_dashboard.html', context)
 
     except Student.DoesNotExist:
         messages.error(request, 'Student record not found. Please contact administrator.')
         return redirect('student_login')
+
+
+@login_required
+def enroll_in_class(request, class_id):
+    """Allow student to enroll in a class"""
+    try:
+        # Get student record
+        student = Student.objects.get(student_id=request.user.username, is_active=True)
+
+        # Get the class
+        class_obj = get_object_or_404(Class, id=class_id, is_active=True)
+
+        # Check if already enrolled
+        if student.enrolled_classes.filter(id=class_id).exists():
+            messages.warning(request, f'You are already enrolled in {class_obj.code}')
+        else:
+            # Enroll student in class
+            student.enrolled_classes.add(class_obj)
+            messages.success(request, f'Successfully enrolled in {class_obj.code} - {class_obj.name}')
+
+        return redirect('student_dashboard')
+
+    except Student.DoesNotExist:
+        messages.error(request, 'Student record not found.')
+        return redirect('student_login')
+    except Exception as e:
+        messages.error(request, f'Error enrolling in class: {str(e)}')
+        return redirect('student_dashboard')
+
+
+@login_required
+def unenroll_from_class(request, class_id):
+    """Allow student to unenroll from a class"""
+    try:
+        # Get student record
+        student = Student.objects.get(student_id=request.user.username, is_active=True)
+
+        # Get the class
+        class_obj = get_object_or_404(Class, id=class_id, is_active=True)
+
+        # Check if enrolled
+        if not student.enrolled_classes.filter(id=class_id).exists():
+            messages.warning(request, f'You are not enrolled in {class_obj.code}')
+        else:
+            # Unenroll student from class
+            student.enrolled_classes.remove(class_obj)
+            messages.success(request, f'Successfully unenrolled from {class_obj.code} - {class_obj.name}')
+
+        return redirect('student_dashboard')
+
+    except Student.DoesNotExist:
+        messages.error(request, 'Student record not found.')
+        return redirect('student_login')
+    except Exception as e:
+        messages.error(request, f'Error unenrolling from class: {str(e)}')
+        return redirect('student_dashboard')
+
+
+@login_required
+def enroll_in_class(request, class_id):
+    """Allow student to enroll in a class"""
+    try:
+        # Get student record
+        student = Student.objects.get(student_id=request.user.username, is_active=True)
+
+        # Get the class
+        class_obj = get_object_or_404(Class, id=class_id, is_active=True)
+
+        # Check if already enrolled
+        if student.enrolled_classes.filter(id=class_id).exists():
+            messages.warning(request, f'You are already enrolled in {class_obj.code}')
+        else:
+            # Enroll student in class
+            student.enrolled_classes.add(class_obj)
+            messages.success(request, f'Successfully enrolled in {class_obj.code} - {class_obj.name}')
+
+        return redirect('student_dashboard')
+
+    except Student.DoesNotExist:
+        messages.error(request, 'Student record not found.')
+        return redirect('student_login')
+    except Exception as e:
+        messages.error(request, f'Error enrolling in class: {str(e)}')
+        return redirect('student_dashboard')
+
+
+@login_required
+def unenroll_from_class(request, class_id):
+    """Allow student to unenroll from a class"""
+    try:
+        # Get student record
+        student = Student.objects.get(student_id=request.user.username, is_active=True)
+
+        # Get the class
+        class_obj = get_object_or_404(Class, id=class_id, is_active=True)
+
+        # Check if enrolled
+        if not student.enrolled_classes.filter(id=class_id).exists():
+            messages.warning(request, f'You are not enrolled in {class_obj.code}')
+        else:
+            # Unenroll student from class
+            student.enrolled_classes.remove(class_obj)
+            messages.success(request, f'Successfully unenrolled from {class_obj.code} - {class_obj.name}')
+
+        return redirect('student_dashboard')
+
+    except Student.DoesNotExist:
+        messages.error(request, 'Student record not found.')
+        return redirect('student_login')
+    except Exception as e:
+        messages.error(request, f'Error unenrolling from class: {str(e)}')
+        return redirect('student_dashboard')
+
+
+@login_required
+def lecturer_attendance_history(request):
+    """Lecturer attendance history view - shows all attendance records across their classes with search functionality"""
+    try:
+        # Check if user is a lecturer
+        if not request.user.is_staff:
+            messages.error(request, 'Access denied. Lecturer privileges required.')
+            return redirect('student_dashboard')
+
+        # Get search parameters
+        search_query = request.GET.get('search', '').strip()
+        class_filter = request.GET.get('class_filter', '')
+        status_filter = request.GET.get('status_filter', '')
+        date_from = request.GET.get('date_from', '')
+        date_to = request.GET.get('date_to', '')
+        student_filter = request.GET.get('student_filter', '')
+        department_filter = request.GET.get('department_filter', '')
+        level_filter = request.GET.get('level_filter', '')
+        semester_filter = request.GET.get('semester_filter', '')
+
+        # Base queryset - all attendance records for lecturer's classes
+        attendance_records = Attendance.objects.filter(
+            class_attended__instructor=request.user
+        ).select_related('student', 'class_attended').order_by('-date', '-timestamp')
+
+        # Apply filters
+        if search_query:
+            attendance_records = attendance_records.filter(
+                Q(student__user__first_name__icontains=search_query) |
+                Q(student__user__last_name__icontains=search_query) |
+                Q(student__student_id__icontains=search_query) |
+                Q(class_attended__name__icontains=search_query) |
+                Q(class_attended__code__icontains=search_query)
+            )
+
+        if class_filter:
+            attendance_records = attendance_records.filter(class_attended__id=class_filter)
+
+        if status_filter:
+            attendance_records = attendance_records.filter(status=status_filter)
+
+        if student_filter:
+            attendance_records = attendance_records.filter(student__id=student_filter)
+
+        if department_filter:
+            attendance_records = attendance_records.filter(student__department__id=department_filter)
+
+        if level_filter:
+            attendance_records = attendance_records.filter(student__level__id=level_filter)
+
+        if semester_filter:
+            attendance_records = attendance_records.filter(student__semester=semester_filter)
+
+        if date_from:
+            try:
+                from_date = timezone.datetime.strptime(date_from, '%Y-%m-%d').date()
+                attendance_records = attendance_records.filter(date__gte=from_date)
+            except ValueError:
+                pass
+
+        if date_to:
+            try:
+                to_date = timezone.datetime.strptime(date_to, '%Y-%m-%d').date()
+                attendance_records = attendance_records.filter(date__lte=to_date)
+            except ValueError:
+                pass
+
+        # Get lecturer's classes for filter dropdown
+        lecturer_classes = Class.objects.filter(
+            instructor=request.user,
+            is_active=True
+        ).order_by('code')
+
+        # Get all students from lecturer's classes for filter dropdown
+        lecturer_students = Student.objects.filter(
+            enrolled_classes__instructor=request.user,
+            is_active=True
+        ).distinct().order_by('user__first_name', 'user__last_name')
+
+        # Get departments and levels for filter dropdowns
+        departments = Department.objects.filter(
+            students__enrolled_classes__instructor=request.user
+        ).distinct().order_by('name')
+
+        levels = Level.objects.filter(
+            students__enrolled_classes__instructor=request.user
+        ).distinct().order_by('code')
+
+        # Semester choices
+        semester_choices = Student.SEMESTER_CHOICES
+
+        # Get departments and levels for filter dropdowns
+        departments = Department.objects.filter(
+            students__enrolled_classes__instructor=request.user
+        ).distinct().order_by('name')
+
+        levels = Level.objects.filter(
+            students__enrolled_classes__instructor=request.user
+        ).distinct().order_by('code')
+
+        # Semester choices
+        semester_choices = Student.SEMESTER_CHOICES
+
+        # Calculate statistics
+        total_records = attendance_records.count()
+        present_count = attendance_records.filter(status='present').count()
+        late_count = attendance_records.filter(status='late').count()
+        absent_count = attendance_records.filter(status='absent').count()
+
+        attendance_rate = round((present_count / total_records * 100), 1) if total_records > 0 else 0
+
+        context = {
+            'lecturer': request.user,
+            'attendance_records': attendance_records,
+            'lecturer_classes': lecturer_classes,
+            'lecturer_students': lecturer_students,
+            'departments': departments,
+            'levels': levels,
+            'semester_choices': semester_choices,
+            'search_query': search_query,
+            'class_filter': class_filter,
+            'status_filter': status_filter,
+            'student_filter': student_filter,
+            'department_filter': department_filter,
+            'level_filter': level_filter,
+            'semester_filter': semester_filter,
+            'date_from': date_from,
+            'date_to': date_to,
+            'total_records': total_records,
+            'present_count': present_count,
+            'late_count': late_count,
+            'absent_count': absent_count,
+            'attendance_rate': attendance_rate,
+        }
+        return render(request, 'attendance/lecturer_attendance_history.html', context)
+
+    except Exception as e:
+        messages.error(request, f'Error loading attendance history: {str(e)}')
+        return redirect('lecturer_dashboard')
+
+
+
 
 
 @login_required
@@ -510,44 +825,87 @@ def lecturer_attendance_session(request, class_id):
         return redirect('lecturer_dashboard')
 
 
+
 @login_required
-def student_mark_attendance(request, class_id):
-    """Student view to mark their own attendance using face recognition"""
+def student_attendance_history(request):
+    """Student attendance history view - shows all attendance records with search functionality"""
     try:
         # Get the student record for the logged-in user
         student = Student.objects.get(student_id=request.user.username, is_active=True)
 
-        # Get the class and verify student is enrolled
-        class_obj = get_object_or_404(Class, id=class_id, is_active=True)
+        # Get search parameters
+        search_query = request.GET.get('search', '').strip()
+        class_filter = request.GET.get('class_filter', '')
+        status_filter = request.GET.get('status_filter', '')
+        date_from = request.GET.get('date_from', '')
+        date_to = request.GET.get('date_to', '')
 
-        if not student.enrolled_classes.filter(id=class_id).exists():
-            messages.error(request, 'You are not enrolled in this class.')
-            return redirect('student_dashboard')
+        # Base queryset
+        attendance_records = Attendance.objects.filter(
+            student=student
+        ).select_related('class_attended').order_by('-date', '-timestamp')
 
-        # Check if student has face encodings
-        if not student.face_encodings.exists():
-            messages.error(request, 'You need to enroll your face first. Please contact administrator.')
-            return redirect('student_dashboard')
+        # Apply filters
+        if search_query:
+            attendance_records = attendance_records.filter(
+                Q(class_attended__name__icontains=search_query) |
+                Q(class_attended__code__icontains=search_query)
+            )
 
-        # Check if attendance already marked today
-        today = timezone.now().date()
-        existing_attendance = Attendance.objects.filter(
-            student=student,
-            class_attended=class_obj,
-            date=today
-        ).first()
+        if class_filter:
+            attendance_records = attendance_records.filter(class_attended__id=class_filter)
+
+        if status_filter:
+            attendance_records = attendance_records.filter(status=status_filter)
+
+        if date_from:
+            try:
+                from_date = timezone.datetime.strptime(date_from, '%Y-%m-%d').date()
+                attendance_records = attendance_records.filter(date__gte=from_date)
+            except ValueError:
+                pass
+
+        if date_to:
+            try:
+                to_date = timezone.datetime.strptime(date_to, '%Y-%m-%d').date()
+                attendance_records = attendance_records.filter(date__lte=to_date)
+            except ValueError:
+                pass
+
+        # Get student's enrolled classes for filter dropdown
+        enrolled_classes = student.enrolled_classes.filter(is_active=True).order_by('code')
+
+        # Calculate statistics
+        total_records = attendance_records.count()
+        present_count = attendance_records.filter(status='present').count()
+        late_count = attendance_records.filter(status='late').count()
+        absent_count = attendance_records.filter(status='absent').count()
+
+        attendance_rate = round((present_count / total_records * 100), 1) if total_records > 0 else 0
 
         context = {
             'student': student,
-            'class': class_obj,
-            'existing_attendance': existing_attendance,
-            'today': today,
+            'attendance_records': attendance_records,
+            'enrolled_classes': enrolled_classes,
+            'search_query': search_query,
+            'class_filter': class_filter,
+            'status_filter': status_filter,
+            'date_from': date_from,
+            'date_to': date_to,
+            'total_records': total_records,
+            'present_count': present_count,
+            'late_count': late_count,
+            'absent_count': absent_count,
+            'attendance_rate': attendance_rate,
         }
-        return render(request, 'attendance/student_mark_attendance.html', context)
+        return render(request, 'attendance/student_attendance_history.html', context)
 
     except Student.DoesNotExist:
         messages.error(request, 'Student record not found. Please contact administrator.')
         return redirect('student_login')
+    except Exception as e:
+        messages.error(request, f'Error loading attendance history: {str(e)}')
+        return redirect('student_dashboard')
 
 
 @login_required
@@ -595,7 +953,7 @@ def student_face_enrollment(request):
                     is_primary=is_primary or student.face_encodings.count() == 0  # First face is always primary
                 )
 
-                messages.success(request, 'Face registered successfully! You can now mark attendance using face recognition.')
+                messages.success(request, 'Face registered successfully! Your lecturers can now mark your attendance using face recognition.')
                 return redirect('student_dashboard')
 
             except Exception as e:
@@ -837,8 +1195,22 @@ def attendance_history(request, class_id=None):
 # API Views for Face Recognition
 @api_view(['POST'])
 def api_recognize_face(request):
-    """API endpoint to recognize a face and mark attendance"""
+    """API endpoint to recognize a face and mark attendance - Lecturer only"""
     try:
+        # Check if user is authenticated and is a lecturer
+        if not request.user.is_authenticated:
+            return Response({
+                'success': False,
+                'message': 'Authentication required'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Check if user is a lecturer
+        if not hasattr(request.user, 'position') or request.user.position != 'lecturer':
+            return Response({
+                'success': False,
+                'message': 'Only lecturers can mark attendance'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         # Use request.data instead of json.loads(request.body)
         image_data = request.data.get('image_data')
         class_id = request.data.get('class_id')
@@ -861,6 +1233,13 @@ def api_recognize_face(request):
                 'success': False,
                 'message': 'Class not found'
             }, status=status.HTTP_404_NOT_FOUND)
+
+        # Check if the lecturer is the instructor of this class
+        if class_obj.instructor != request.user:
+            return Response({
+                'success': False,
+                'message': 'You can only take attendance for your own classes'
+            }, status=status.HTTP_403_FORBIDDEN)
 
         # We'll check enrollment and duplicate attendance after face recognition
         today = timezone.now().date()
