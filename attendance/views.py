@@ -204,7 +204,10 @@ def student_signup(request):
                 student.semester = semester
 
             if phone:
-                student.phone = phone
+                # Set phone on user, not student (student.phone is a property)
+                user = user if hasattr(user, 'phone') else User.objects.get(pk=user.pk)
+                user.phone = phone
+                user.save()
 
             student.save()
             print(f"✅ Student record updated with ID: {student.id}")
@@ -308,11 +311,13 @@ def debug_signup(request):
                 logger.info(f"DEBUG: User created successfully: {user.id}")
 
                 # Create student record (only pass valid fields)
-                student = Student.objects.create(
-                    student_id=student_id,
-                    user=user,
-                    is_active=True
-                )
+                student = Student.objects.get(user=user)
+                if phone:
+                    # Refresh user from DB to avoid stale object
+                    user = User.objects.get(pk=user.pk)
+                    user.phone = phone
+                    user.save()
+                
                 logger.info(f"DEBUG: Student created successfully: {student.id}")
 
                 # Authenticate and login
