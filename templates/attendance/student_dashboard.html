@@ -114,15 +114,57 @@
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 px-0">
+            <!-- Hamburger and Offcanvas Sidebar for Mobile/Tablet -->
+            <nav class="navbar navbar-dark bg-dark d-lg-none">
+                <div class="container-fluid">
+                    <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <span class="navbar-brand ms-2">Employee Portal</span>
+                </div>
+            </nav>
+            <div class="offcanvas offcanvas-start d-lg-none" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="sidebarOffcanvasLabel">Menu</h5>
+                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body p-0">
+                    <div class="sidebar">
+                        <div class="p-4 text-center border-bottom border-secondary">
+                            <i class="fas fa-user-graduate fa-3x text-primary mb-3"></i>
+                            <h5 class="text-white mb-0">Student Portal</h5>
+                            <small class="text-muted">{{ student.get_full_name|default:user.username }}</small>
+                        </div>
+                        <nav class="nav flex-column">
+                            <a class="nav-link active" href="{% url 'student_dashboard' %}">
+                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                            </a>
+                            <a class="nav-link" href="#classes">
+                                <i class="fas fa-chalkboard me-2"></i>My Classes
+                            </a>
+                            <a class="nav-link" href="{% url 'student_attendance_history' %}">
+                                <i class="fas fa-calendar-check me-2"></i>Attendance
+                            </a>
+                            <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#profileModal">
+                                <i class="fas fa-user me-2"></i>Profile
+                            </a>
+                            <div class="border-top border-secondary mt-3 pt-3">
+                                <a class="nav-link" href="{% url 'student_logout' %}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                </a>
+                            </div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <!-- Sidebar for Desktop -->
+            <div class="col-lg-2 px-0 d-none d-lg-block">
                 <div class="sidebar">
                     <div class="p-4 text-center border-bottom border-secondary">
                         <i class="fas fa-user-graduate fa-3x text-primary mb-3"></i>
-                        <h5 class="text-white mb-0">Employee Portal</h5>
+                        <h5 class="text-white mb-0">Student Portal</h5>
                         <small class="text-muted">{{ student.get_full_name|default:user.username }}</small>
                     </div>
-
                     <nav class="nav flex-column">
                         <a class="nav-link active" href="{% url 'student_dashboard' %}">
                             <i class="fas fa-tachometer-alt me-2"></i>Dashboard
@@ -133,9 +175,6 @@
                         <a class="nav-link" href="{% url 'student_attendance_history' %}">
                             <i class="fas fa-calendar-check me-2"></i>Attendance
                         </a>
-                        {% comment %} <a class="nav-link" href="{% url 'student_face_enrollment' %}">
-                            <i class="fas fa-camera me-2"></i>Face Registration
-                        </a> {% endcomment %}
                         <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#profileModal">
                             <i class="fas fa-user me-2"></i>Profile
                         </a>
@@ -149,7 +188,7 @@
             </div>
 
             <!-- Main Content -->
-            <div class="col-md-9 col-lg-10 px-0">
+            <div class="col-lg-10 px-0">
                 <div class="main-content p-4">
                     <!-- Messages -->
                     {% if messages %}

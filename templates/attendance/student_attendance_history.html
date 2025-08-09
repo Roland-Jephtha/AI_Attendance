@@ -122,7 +122,7 @@
                 <div class="sidebar">
                     <div class="p-4 text-center border-bottom border-secondary">
                         <i class="fas fa-user-graduate fa-3x text-primary mb-3"></i>
-                        <h5 class="text-white mb-0">Student Portal</h5>
+                        <h5 class="text-white mb-0">Employee Portal</h5>
                         <small class="text-muted">{{ student.get_full_name|default:user.username }}</small>
                     </div>
 
@@ -131,7 +131,7 @@
                             <i class="fas fa-tachometer-alt me-2"></i>Dashboard
                         </a>
                         <a class="nav-link" href="#classes">
-                            <i class="fas fa-chalkboard me-2"></i>My Classes
+                            <i class="fas fa-chalkboard me-2"></i>Offices
                         </a>
                         <a class="nav-link active" href="{% url 'student_attendance_history' %}">
                             <i class="fas fa-calendar-check me-2"></i>Attendance
@@ -287,11 +287,10 @@
                                 <table class="table table-hover mb-0">
                                     <thead>
                                         <tr>
-                                            <th><i class="fas fa-chalkboard me-2"></i>Class</th>
+                                            <th><i class="fas fa-chalkboard me-2"></i>Offices</th>
                                             <th><i class="fas fa-calendar me-2"></i>Date</th>
                                             <th><i class="fas fa-clock me-2"></i>Time</th>
                                             <th><i class="fas fa-flag me-2"></i>Status</th>
-                                            <th><i class="fas fa-sticky-note me-2"></i>Notes</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -339,14 +338,7 @@
                                                     <small class="text-muted">N/A</small>
                                                 {% endif %}
                                             </td> {% endcomment %}
-                                            <td>
-                                                {% if record.notes %}
-                                                    <small>{{ record.notes|truncatechars:50 }}</small>
-                                                {% else %}
-                                                    <small class="text-muted">-</small>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
+                           
                                         {% endfor %}
                                     </tbody>
                                 </table>
@@ -380,7 +372,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        <i class="fas fa-user me-2"></i>Student Profile
+                        <i class="fas fa-user me-2"></i>Employee Profile
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -389,12 +381,12 @@
                         <div class="col-12 text-center mb-4">
                             <i class="fas fa-user-graduate fa-4x text-primary mb-3"></i>
                             <h4>{{ student.get_full_name|default:user.username }}</h4>
-                            <p class="text-muted">Student Profile</p>
+                            <p class="text-muted">Employee Profile</p>
                         </div>
                     </div>
                     <table class="table table-borderless">
                         <tr>
-                            <td><strong><i class="fas fa-id-card me-2"></i>Student ID:</strong></td>
+                            <td><strong><i class="fas fa-id-card me-2"></i>Employee ID:</strong></td>
                             <td>{{ student.student_id }}</td>
                         </tr>
                         <tr>
@@ -410,7 +402,7 @@
                             <td>{{ student.phone|default:"Not provided" }}</td>
                         </tr>
                         <tr>
-                            <td><strong><i class="fas fa-chalkboard me-2"></i>Enrolled Classes:</strong></td>
+                            <td><strong><i class="fas fa-chalkboard me-2"></i>Active Offices:</strong></td>
                             <td>{{ enrolled_classes|length }}</td>
                         </tr>
                         <tr>
