@@ -172,17 +172,24 @@ def face_image_upload_path(instance, filename):
 
 class FaceEncoding(models.Model):
     """Model to store face encodings for students"""
+    DETECTION_STATUS_CHOICES = [
+        ('success', 'Success'),
+        ('no_face', 'No Face Detected'),
+        ('error', 'Error'),
+    ]
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='face_encodings')
     image = models.ImageField(upload_to=face_image_upload_path)
-    encoding_data = models.TextField()  # JSON string of face encoding
+    encoding_data = models.TextField(blank=True, null=True)  # JSON string of face encoding
     is_primary = models.BooleanField(default=False)
+    detection_status = models.CharField(max_length=20, choices=DETECTION_STATUS_CHOICES, default='success')
+    error_message = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-is_primary', '-created_at']
 
     def __str__(self):
-        return f"Face encoding for {self.student.full_name}"
+        return f"Face encoding for {self.student.full_name} ({self.detection_status})"
 
     def delete(self, *args, **kwargs):
         # Delete the image file when the model instance is deleted

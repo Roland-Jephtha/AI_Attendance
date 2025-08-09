@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Dashboard - AI Attendance System</title>
+    <title>Employee Dashboard - AI Attendance System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -119,7 +119,7 @@
                 <div class="sidebar">
                     <div class="p-4 text-center border-bottom border-secondary">
                         <i class="fas fa-user-graduate fa-3x text-primary mb-3"></i>
-                        <h5 class="text-white mb-0">Student Portal</h5>
+                        <h5 class="text-white mb-0">Employee Portal</h5>
                         <small class="text-muted">{{ student.get_full_name|default:user.username }}</small>
                     </div>
 
@@ -167,7 +167,7 @@
                             <h2 class="mb-1">
                                 <i class="fas fa-sun me-2 text-warning"></i>Good day, {{ student.get_full_name|default:user.username }}!
                             </h2>
-                            <p class="text-muted mb-0">View your enrolled classes and attendance history below.</p>
+                            <p class="text-muted mb-0">View your active offices and attendance history below.</p>
                         </div>
                         <div class="text-end">
                             <h4 class="mb-0">{{ today|date:"M d, Y" }}</h4>
@@ -181,7 +181,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <i class="fas fa-info-circle me-2"></i>
-                                <strong>Face Not Registered!</strong> Register your face so lecturers can mark your attendance using face recognition.
+                                <strong>Face Not Registered!</strong> Register your face so supervisors can mark your attendance using face recognition.
                             </div>
                             <a href="{% url 'student_face_enrollment' %}" class="btn btn-info btn-sm">
                                 <i class="fas fa-camera me-1"></i>Register Face
@@ -198,7 +198,7 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <h3 class="mb-0">{{ classes_with_attendance|length }}</h3>
-                                        <p class="mb-0">Enrolled Classes</p>
+                                        <p class="mb-0">Active Offices</p>
                                     </div>
                                     <i class="fas fa-chalkboard fa-2x opacity-75"></i>
                                 </div>
@@ -237,7 +237,7 @@
                     <!-- Classes Section -->
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h3 class="mb-0">
-                            <i class="fas fa-chalkboard me-2"></i>Your Classes
+                            <i class="fas fa-chalkboard me-2"></i>Your Offices
                         </h3>
                     </div>
 
@@ -306,7 +306,7 @@
                                                 <div class="text-center bg-light p-3 rounded-3">
                                                     <small class="text-muted">
                                                         <i class="fas fa-info-circle me-1"></i>
-                                                        Attendance will be marked by your lecturer
+                                                        Attendance will be marked by your supervisor
                                                     </small>
                                                 </div>
                                             {% endif %}
@@ -321,10 +321,10 @@
                                 <div class="card">
                                     <div class="card-body text-center py-5">
                                         <i class="fas fa-chalkboard fa-3x text-muted mb-4"></i>
-                                        <h4 class="text-muted mb-3">No Classes Enrolled</h4>
-                                        <p class="text-muted mb-4">You are not enrolled in any classes yet.</p>
+                                        <h4 class="text-muted mb-3">No active office</h4>
+                                        <p class="text-muted mb-4">You are not active in any office yet.</p>
 
-                                        <div class="alert alert-info text-start">
+                                        {% comment %} <div class="alert alert-info text-start">
                                             <h6 class="alert-heading">
                                                 <i class="fas fa-info-circle me-2"></i>How to get enrolled:
                                             </h6>
@@ -333,12 +333,12 @@
                                                 <li><strong>Visit the admin office</strong> - They can enroll you in the appropriate classes</li>
                                                 <li><strong>Check with your academic advisor</strong> - They can help with course registration</li>
                                             </ol>
-                                        </div>
+                                        </div> {% endcomment %}
 
                                         <div class="mt-4">
                                             <p class="small text-muted">
                                                 <i class="fas fa-user-tie me-1"></i>
-                                                Student ID: <strong>{{ student.student_id }}</strong> |
+                                                Employee ID: <strong>{{ student.student_id }}</strong> |
                                                 Email: <strong>{{ student.email }}</strong>
                                             </p>
                                         </div>
@@ -352,7 +352,7 @@
                     {% if available_classes %}
                     <div class="d-flex justify-content-between align-items-center mb-4 mt-5">
                         <h3 class="mb-0">
-                            <i class="fas fa-plus-circle me-2"></i>Available Classes
+                            <i class="fas fa-plus-circle me-2"></i>Available Offices
                         </h3>
                         <small class="text-muted">Click to enroll</small>
                     </div>
@@ -383,13 +383,13 @@
                                     <div class="mb-3">
                                         <small class="text-muted">
                                             <i class="fas fa-users me-1"></i>
-                                            {{ class.students.count }} students enrolled
+                                            {{ class.students.count }} employees in office
                                         </small>
                                     </div>
 
                                     <div class="d-grid">
                                         <a href="{% url 'enroll_in_class' class.id %}" class="btn btn-success">
-                                            <i class="fas fa-plus me-2"></i>Enroll in Class
+                                            <i class="fas fa-plus me-2"></i>Be part of office
                                         </a>
                                     </div>
                                 </div>
@@ -413,7 +413,7 @@
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
-                                            <th>Class</th>
+                                            <th>Office</th>
                                             <th>Date</th>
                                             <th>Time</th>
                                             <th>Status</th>

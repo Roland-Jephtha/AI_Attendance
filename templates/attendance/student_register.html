@@ -1,7 +1,7 @@
 {% extends 'attendance/base.html' %}
 {% load static %}
 
-{% block title %}Register Student - AI Attendance System{% endblock %}
+{% block title %}Register Employee - AI Attendance System{% endblock %}
 
 {% block page_header %}
 <div class="row">
@@ -9,12 +9,12 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'student_list' %}">Students</a></li>
-                <li class="breadcrumb-item active">Register Student</li>
+                <li class="breadcrumb-item"><a href="{% url 'student_list' %}">Employees</a></li>
+                <li class="breadcrumb-item active">Register Employee</li>
             </ol>
         </nav>
         <h1 class="h2 mb-4">
-            <i class="fas fa-user-plus me-2"></i>Register New Student
+            <i class="fas fa-user-plus me-2"></i>Register New Employee
         </h1>
     </div>
 </div>
@@ -26,7 +26,7 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-user me-2"></i>Student Information
+                    <i class="fas fa-user me-2"></i>Employee Information
                 </h5>
             </div>
             <div class="card-body">
@@ -36,9 +36,9 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="student_id" class="form-label">Student ID *</label>
-                                <input type="text" class="form-control" id="student_id" name="student_id" required>
-                                <div class="form-text">Unique identifier for the student</div>
+                                <label for="employee_id" class="form-label">Employee ID *</label>
+                                <input type="text" class="form-control" id="employee_id" name="employee_id" required>
+                                <div class="form-text">Unique identifier for the employee</div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -75,7 +75,7 @@
                             <i class="fas fa-times me-1"></i>Cancel
                         </a>
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-1"></i>Register Student
+                            <i class="fas fa-save me-1"></i>Register Employee
                         </button>
                     </div>
                 </form>
@@ -91,15 +91,15 @@
                 </h5>
             </div>
             <div class="card-body">
-                <p class="mb-3">After registering the student, you will need to:</p>
+                <p class="mb-3">After registering the employee, you will need to:</p>
                 <ol>
                     <li class="mb-2">
                         <strong>Enroll Face Images</strong><br>
-                        <small class="text-muted">Capture and register the student's face for recognition</small>
+                        <small class="text-muted">Capture and register the employee's face for recognition</small>
                     </li>
                     <li class="mb-2">
-                        <strong>Assign to Classes</strong><br>
-                        <small class="text-muted">Enroll the student in relevant classes</small>
+                        <strong>Assign to Departments</strong><br>
+                        <small class="text-muted">Assign the employee to relevant departments</small>
                     </li>
                     <li class="mb-2">
                         <strong>Test Recognition</strong><br>
@@ -123,12 +123,12 @@
 <script>
 // Form validation
 document.querySelector('form').addEventListener('submit', function(e) {
-    const studentId = document.getElementById('student_id').value.trim();
+    const employeeId = document.getElementById('employee_id').value.trim();
     const email = document.getElementById('email').value.trim();
     const firstName = document.getElementById('first_name').value.trim();
     const lastName = document.getElementById('last_name').value.trim();
     
-    if (!studentId || !email || !firstName || !lastName) {
+    if (!employeeId || !email || !firstName || !lastName) {
         e.preventDefault();
         alert('Please fill in all required fields.');
         return;
@@ -140,8 +140,8 @@ document.querySelector('form').addEventListener('submit', function(e) {
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Registering...';
 });
 
-// Auto-format student ID
-document.getElementById('student_id').addEventListener('input', function() {
+// Auto-format employee ID
+document.getElementById('employee_id').addEventListener('input', function() {
     this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 });
 </script>

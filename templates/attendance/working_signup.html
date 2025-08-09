@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Signup - AI Attendance System</title>
+    <title>Employee Signup - AI Attendance System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -68,8 +68,8 @@
                 <div class="col-md-8 col-lg-6">
                     <div class="signup-card">
                         <div class="signup-header">
-                            <i class="fas fa-graduation-cap fa-3x mb-3"></i>
-                            <h2 class="mb-0">Student Registration</h2>
+                            <i class="fas fa-user-tie fa-3x mb-3"></i>
+                            <h2 class="mb-0">Employee Registration</h2>
                             <p class="mb-0 opacity-75">Join the AI Attendance System</p>
                         </div>
                         
@@ -89,11 +89,11 @@
                                 {% csrf_token %}
                                 
                                 <div class="mb-3">
-                                    <label for="student_id" class="form-label">
-                                        <i class="fas fa-id-card me-2"></i>Student ID *
+                                    <label for="employee_id" class="form-label">
+                                        <i class="fas fa-id-card me-2"></i>Employee ID *
                                     </label>
-                                    <input type="text" class="form-control" id="student_id" name="student_id" 
-                                           placeholder="Enter your student ID" required>
+                                    <input type="text" class="form-control" id="employee_id" name="employee_id" 
+                                           placeholder="Enter your employee ID" required>
                                 </div>
                                 
                                 <div class="row">
@@ -126,11 +126,15 @@
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="phone" class="form-label">
-                                        <i class="fas fa-phone me-2"></i>Phone Number
+                                    <label for="department" class="form-label">
+                                        <i class="fas fa-building me-2"></i>Department *
                                     </label>
-                                    <input type="tel" class="form-control" id="phone" name="phone" 
-                                           placeholder="Optional phone number">
+                                    <select class="form-control" id="department" name="department" required>
+                                        <option value="">Select Department</option>
+                                        {% for department in departments %}
+                                            <option value="{{ department.id }}">{{ department.name }}</option>
+                                        {% endfor %}
+                                    </select>
                                 </div>
                                 
                                 <div class="mb-3">
@@ -159,7 +163,7 @@
                             <div class="text-center">
                                 <p class="mb-2">Already have an account?</p>
                                 <a href="{% url 'student_login' %}" class="btn btn-outline-secondary">
-                                    <i class="fas fa-sign-in-alt me-2"></i>Sign In Instead
+                                    <i class="fas fa-sign-in-alt me-2"></i>Employee Sign In Instead
                                 </a>
                             </div>
                             

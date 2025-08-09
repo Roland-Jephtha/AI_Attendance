@@ -291,8 +291,7 @@
                                             <th><i class="fas fa-calendar me-2"></i>Date</th>
                                             <th><i class="fas fa-clock me-2"></i>Time</th>
                                             <th><i class="fas fa-flag me-2"></i>Status</th>
-                                            {% comment %} <th><i class="fas fa-percentage me-2"></i>Confidence</th>
-                                            <th><i class="fas fa-sticky-note me-2"></i>Notes</th> {% endcomment %}
+                                            <th><i class="fas fa-sticky-note me-2"></i>Notes</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -340,13 +339,13 @@
                                                     <small class="text-muted">N/A</small>
                                                 {% endif %}
                                             </td> {% endcomment %}
-                                            {% comment %} <td>
+                                            <td>
                                                 {% if record.notes %}
                                                     <small>{{ record.notes|truncatechars:50 }}</small>
                                                 {% else %}
                                                     <small class="text-muted">-</small>
                                                 {% endif %}
-                                            </td> {% endcomment %}
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>

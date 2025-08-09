@@ -44,5 +44,6 @@ urlpatterns = [
     # API URLs
     path('api/recognize-face/', views.api_recognize_face, name='api_recognize_face'),
     path('api/validate-image/', views.api_validate_image, name='api_validate_image'),
+    path('api/validate_image/', views.api_validate_image, name='api_validate_image'),
     path('api/attendance-status/<int:class_id>/', views.api_attendance_status, name='api_attendance_status'),
 ]

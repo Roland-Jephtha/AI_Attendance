@@ -186,7 +186,7 @@ document.getElementById('retakeImage').addEventListener('click', function() {
     capturedImageData = null;
 });
 
-// Validate image (client-side basic validation)
+// Validate image (Face++ real-time validation)
 function validateImage(imageData) {
     try {
         // Basic client-side validation
@@ -194,21 +194,38 @@ function validateImage(imageData) {
             showValidationStatus('Image data is too small. Please try again.', 'danger');
             return;
         }
-
-        // Check if it's a valid base64 image
         if (!imageData.startsWith('data:image/')) {
             showValidationStatus('Invalid image format. Please try again.', 'danger');
             return;
         }
-
-        // If basic validation passes, show success and enable form
-        showValidationStatus('Image captured successfully! You can now enroll the face.', 'success');
-        document.getElementById('imageData').value = capturedImageData;
-        document.getElementById('enrollmentForm').style.display = 'block';
-
+        // Real-time Face++ validation
+        fetch('/api/validate_image/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf_token], [name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ image_data: imageData })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showValidationStatus('Face detected! You can now enroll the face.', 'success');
+                document.getElementById('imageData').value = capturedImageData;
+                document.getElementById('enrollmentForm').style.display = 'block';
+            } else {
+                showValidationStatus(data.message || 'Face not detected. Please try again.', 'danger');
+                document.getElementById('enrollmentForm').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            showValidationStatus('Error validating with Face++. Please try again.', 'danger');
+            document.getElementById('enrollmentForm').style.display = 'none';
+        });
     } catch (error) {
         console.error('Error validating image:', error);
         showValidationStatus('Error validating image. Please try again.', 'danger');
+        document.getElementById('enrollmentForm').style.display = 'none';
     }
 }
 

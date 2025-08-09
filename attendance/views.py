@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
+import os
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -13,9 +14,14 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 import json
+import base64
 import logging
+import requests
 
 from .models import CustomUser, Student, Lecturer, Class, Attendance, FaceEncoding, AttendanceSession, Department, Level
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from . import faceplusplus_service
 
 # Get the custom user model
 User = get_user_model()
@@ -23,34 +29,115 @@ User = get_user_model()
 
 
 
-# Lazy import for face recognition service with fallback
-def get_face_recognition_service():
-    try:
-        # Try new DeepFace service first
-        from .deepface_service import deepface_service
-        if deepface_service.available:
-            print("✅ Using DeepFace service")
-            return deepface_service
 
-        # Fall back to old service
-        from .face_recognition_utils import face_recognition_service, get_fallback_service
-        if face_recognition_service.available:
-            print("✅ Using old face recognition service")
-            return face_recognition_service
+# Face++ Service Wrapper for Django views
+class FacePPService:
+    def __init__(self):
+        self.available = True  # Always available if API keys are set
+
+    def validate_image_quality(self, image_url):
+        # For Face++, just check if a face is detected using image URL only
+        try:
+            # Print the full API response for debugging
+            data = {
+                'api_key': faceplusplus_service.FACEPP_API_KEY,
+                'api_secret': faceplusplus_service.FACEPP_API_SECRET,
+                'image_base64': image_url
+            }
+            response = requests.post(faceplusplus_service.FACEPP_DETECT_URL, data=data)
+            print(image_url)
+            print("[DEBUG] Face++ API response:", response.text)
+            result = response.json()
+            if 'faces' in result and len(result['faces']) > 0:
+                return True, "Image quality is acceptable"
+            else:
+                return False, "No face detected in image"
+        except Exception as e:
+            return False, f"Error validating image: {str(e)}"
+
+    def enroll_student_face(self, student, image_data, is_primary=False):
+        # Save the image to MEDIA, store the path in the DB, and use the public URL for Face++
+        import logging
+        from .models import FaceEncoding
+        from django.conf import settings
+        from django.core.files.base import ContentFile
+        import base64, os
+        logger = logging.getLogger(__name__)
+        if image_data.startswith('data:image'):
+            image_data_base64 = image_data.split(',')[1]
         else:
-            # Fall back to simple service
-            fallback = get_fallback_service()
-            if fallback and fallback.available:
-                print("✅ Using simple fallback service")
-                return fallback
+            image_data_base64 = image_data
+        img_bytes = base64.b64decode(image_data_base64)
+        img_content = ContentFile(img_bytes)
+        face_encoding = FaceEncoding.objects.create(
+            student=student,
+            is_primary=is_primary,
+            detection_status='error',  # will update after detection
+        )
+        filename = f"{student.student_id}_{face_encoding.id}.jpg"
+        face_encoding.image.save(filename, img_content)
+        face_encoding.save()
+        # Construct the public URL (for your records, not for Face++)
+        media_url = getattr(settings, 'MEDIA_URL', '/media/')
+        image_url = media_url.rstrip('/') + '/' + face_encoding.image.name.replace('\\', '/')
+        print(f"MEDIA IMAGE URL (enrollment): {image_url}")
+        try:
+            logger.info(f"Calling Face++ to detect face token using base64 data (not image_url)")
+            face_token = faceplusplus_service.detect_face_token_from_base64(image_data_base64)
+            logger.info(f"Face++ returned face_token: {face_token}")
+            if not face_token:
+                face_encoding.detection_status = 'no_face'
+                face_encoding.error_message = 'No face detected in image'
+                face_encoding.save()
+                raise ValueError("No face detected in image")
+            face_encoding.encoding_data = face_token
+            face_encoding.detection_status = 'success'
+            face_encoding.error_message = ''
+            face_encoding.save()
+            return face_encoding
+        except Exception as e:
+            logger.error(f"Error enrolling student face: {str(e)}")
+            face_encoding.detection_status = 'error'
+            face_encoding.error_message = str(e)
+            face_encoding.save()
+            raise ValueError(f"Could not enroll face: {str(e)}")
 
-        print("❌ No face recognition service available")
-        return None
-    except ImportError as e:
-        print(f"❌ Import error: {e}")
-        return None
+    def recognize_student(self, image_data):
+        # Use base64 image data for Face++ recognition (no Cloudinary)
+        try:
+            print(f"[DEBUG] image_data type: {type(image_data)}, length: {len(image_data)}")
+            if image_data.startswith('data:image'):
+                image_data_base64 = image_data.split(',')[1]
+            else:
+                image_data_base64 = image_data
+            detected_token = faceplusplus_service.detect_face_token_from_base64(image_data_base64)
+            print(f"[DEBUG] Face++ used base64 for recognition.")
+            if not detected_token:
+                return None, 0
+            from .models import FaceEncoding
+            best_match = None
+            best_confidence = 0
+            for fe in FaceEncoding.objects.all():
+                result = faceplusplus_service.compare_face_tokens(detected_token, fe.encoding_data)
+                confidence = result.get('confidence', 0)
+                if confidence > best_confidence and confidence > 80:  # 80 is a typical threshold
+                    best_match = fe.student
+                    best_confidence = confidence
+            if best_match:
+                return best_match, best_confidence
+            return None, 0
+        except Exception as e:
+            import logging
+            logging.error(f"Error recognizing student: {str(e)}")
+            print(f"[DEBUG] Error recognizing student: {str(e)}")
+            return None, 0
+
+# Global instance
+face_service = FacePPService()
 
 logger = logging.getLogger(__name__)
+
+
 
 
 
@@ -100,7 +187,7 @@ def student_signup(request):
 
         try:
             # Get form data
-            student_id = request.POST.get('student_id', '').strip()
+            employee_id = request.POST.get('employee_id', '').strip()
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
             email = request.POST.get('email', '').strip()
@@ -108,19 +195,18 @@ def student_signup(request):
             password = request.POST.get('password', '')
             confirm_password = request.POST.get('confirm_password', '')
             department_id = request.POST.get('department', '')
-            level_id = request.POST.get('level', '')
-            semester = request.POST.get('semester', '')
+            department_id = request.POST.get('department', '')
 
             print(f"📝 Form Data Received:")
-            print(f"   Student ID: '{student_id}'")
+            print(f"   Employee ID: '{employee_id}'")
             print(f"   Name: '{first_name} {last_name}'")
             print(f"   Email: '{email}'")
             print(f"   Phone: '{phone}'")
 
             # Validation
-            if not student_id:
-                print("❌ Missing student ID")
-                messages.error(request, 'Student ID is required')
+            if not employee_id:
+                print("❌ Missing employee ID")
+                messages.error(request, 'Employee ID is required')
                 return render(request, 'attendance/student_signup.html')
 
             if not first_name:
@@ -149,14 +235,14 @@ def student_signup(request):
                 return render(request, 'attendance/student_signup.html')
 
             # Check existing records more thoroughly
-            if Student.objects.filter(student_id=student_id).exists():
-                print(f"❌ Student ID {student_id} already exists in Student table")
-                messages.error(request, f'Student ID {student_id} already exists')
+            if Student.objects.filter(student_id=employee_id).exists():
+                print(f"❌ Employee ID {employee_id} already exists in Employee table")
+                messages.error(request, f'Employee ID {employee_id} already exists')
                 return render(request, 'attendance/student_signup.html')
 
-            if User.objects.filter(username=student_id).exists():
-                print(f"❌ Username {student_id} already exists in User table")
-                messages.error(request, f'Student ID {student_id} already exists')
+            if User.objects.filter(username=employee_id).exists():
+                print(f"❌ Username {employee_id} already exists in User table")
+                messages.error(request, f'Employee ID {employee_id} already exists')
                 return render(request, 'attendance/student_signup.html')
 
 
@@ -171,10 +257,10 @@ def student_signup(request):
                 return render(request, 'attendance/student_signup.html')
 
             print("✅ All validation passed")
-            print(f"🔨 Creating account for {student_id}...")
+            print(f"🔨 Creating account for {employee_id}...")
 
             user = CustomUser.objects.create_user(
-                username=student_id,
+                username=employee_id,
                 email=email,
                 password=password,
                 first_name=first_name,
@@ -193,15 +279,12 @@ def student_signup(request):
                 except Department.DoesNotExist:
                     pass
 
-            if level_id:
+            if department_id:
                 try:
-                    level = Level.objects.get(id=level_id)
-                    student.level = level
-                except Level.DoesNotExist:
+                    department = Department.objects.get(id=department_id)
+                    student.department = department
+                except Department.DoesNotExist:
                     pass
-
-            if semester:
-                student.semester = semester
 
             if phone:
                 # Set phone on user, not student (student.phone is a property)
@@ -216,7 +299,7 @@ def student_signup(request):
             auth_user = authenticate(request, username=email, password=password)
             if auth_user:
                 login(request, auth_user)
-                print(f"✅ User {student_id} logged in successfully with email!")
+                print(f"✅ User {employee_id} logged in successfully with email!")
                 print(f"🎯 Redirecting to face enrollment...")
                 messages.success(request, f'Welcome {student.full_name}! Let\'s set up your face recognition.')
                 return redirect('student_face_enrollment')
@@ -236,13 +319,8 @@ def student_signup(request):
         print("📄 SIGNUP: Showing signup form (GET request)")
         # Get departments and levels for dropdowns
         departments = Department.objects.all().order_by('name')
-        levels = Level.objects.all().order_by('code')
-        semester_choices = Student.SEMESTER_CHOICES
-
         context = {
             'departments': departments,
-            'levels': levels,
-            'semester_choices': semester_choices,
         }
         return render(request, 'attendance/student_signup.html', context)
 
@@ -922,44 +1000,41 @@ def student_face_enrollment(request):
 
         if request.method == 'POST':
             try:
-                image_data = request.POST.get('image_data')
+                # Accept multiple images: image_data_list[] from POST (as list)
+                image_data_list = request.POST.getlist('image_data_list')
                 is_primary = request.POST.get('is_primary') == 'true'
 
-                if not image_data:
-                    messages.error(request, 'No image data provided')
+                if not image_data_list or len(image_data_list) == 0:
+                    messages.error(request, 'No images provided. Please upload at least one image.')
                     return render(request, 'attendance/student_face_enrollment.html', {'student': student})
 
-                # Get face recognition service
-                face_service = get_face_recognition_service()
-                if not face_service or not face_service.available:
-                    messages.error(request, 'Face recognition service not available. Please try again later.')
-                    return render(request, 'attendance/student_face_enrollment.html', {'student': student})
+                # Use global face_service instance directly
 
-                # Validate image quality
-                try:
-                    is_valid, message = face_service.validate_image_quality(image_data)
-                    if not is_valid:
-                        messages.error(request, f'Image validation failed: {message}')
-                        context = {
-                            'student': student,
-                            'existing_encodings': student.face_encodings.count(),
-                            'is_first_enrollment': student.face_encodings.count() == 0,
-                        }
-                        return render(request, 'attendance/student_face_enrollment.html', context)
-                except Exception as validation_error:
-                    logger.error(f"Error during image validation: {str(validation_error)}")
-                    messages.warning(request, 'Image validation skipped due to service unavailability. Proceeding with enrollment.')
-                    # Continue with enrollment even if validation fails
+                errors = []
+                enrolled_count = 0
+                for idx, image_data in enumerate(image_data_list):
+                    try:
+                        is_valid, message = face_service.validate_image_quality(image_data)
+                        if not is_valid:
+                            errors.append(f'Image {idx+1}: {message}')
+                            continue
+                        face_service.enroll_student_face(
+                            student=student,
+                            image_data=image_data,
+                            is_primary=(is_primary or student.face_encodings.count() == 0) and enrolled_count == 0
+                        )
+                        enrolled_count += 1
+                    except Exception as validation_error:
+                        logger.error(f"Error during image validation/enrollment: {str(validation_error)}")
+                        errors.append(f'Image {idx+1}: Error during enrollment')
 
-                # Enroll face
-                face_encoding = face_service.enroll_student_face(
-                    student=student,
-                    image_data=image_data,
-                    is_primary=is_primary or student.face_encodings.count() == 0  # First face is always primary
-                )
-
-                messages.success(request, 'Face registered successfully! Your lecturers can now mark your attendance using face recognition.')
-                return redirect('student_dashboard')
+                if enrolled_count > 0:
+                    messages.success(request, f'{enrolled_count} face image(s) registered successfully! Your lecturers can now mark your attendance using face recognition.')
+                if errors:
+                    for err in errors:
+                        messages.error(request, err)
+                if enrolled_count > 0:
+                    return redirect('student_dashboard')
 
             except Exception as e:
                 logger.error(f"Error enrolling face: {str(e)}")
@@ -1065,44 +1140,53 @@ def face_enrollment(request, student_id):
 
     if request.method == 'POST':
         try:
-            image_data = request.POST.get('image_data')
+            # Accept multiple images: image_data_list[] from POST (as list)
+            image_data_list = request.POST.getlist('image_data_list')
             is_primary = request.POST.get('is_primary') == 'true'
 
-            if not image_data:
-                messages.error(request, 'No image data provided')
+            if not image_data_list or len(image_data_list) == 0:
+                messages.error(request, 'No images provided. Please upload at least one image.')
                 return render(request, 'attendance/face_enrollment.html', {'student': student})
 
             # Get face recognition service
-            face_service = get_face_recognition_service()
-            if not face_service or not face_service.available:
-                messages.error(request, 'Face recognition service not available. Please install DeepFace.')
-                return render(request, 'attendance/face_enrollment.html', {'student': student})
+            # Use Face++ service
+            face_service = face_service
 
-            # Validate image quality
-            is_valid, message = face_service.validate_image_quality(image_data)
-            if not is_valid:
-                messages.error(request, f'Image validation failed: {message}')
-                return render(request, 'attendance/face_enrollment.html', {'student': student})
+            errors = []
+            enrolled_count = 0
+            for idx, image_data in enumerate(image_data_list):
+                try:
+                    is_valid, message = face_service.validate_image_quality(image_data)
+                    if not is_valid:
+                        errors.append(f'Image {idx+1}: {message}')
+                        continue
+                    face_service.enroll_student_face(
+                        student=student,
+                        image_data=image_data,
+                        is_primary=(is_primary or student.face_encodings.count() == 0) and enrolled_count == 0
+                    )
+                    enrolled_count += 1
+                except Exception as validation_error:
+                    logger.error(f"Error during image validation/enrollment: {str(validation_error)}")
+                    errors.append(f'Image {idx+1}: Error during enrollment')
 
-            # Enroll face
-            face_encoding = face_service.enroll_student_face(
-                student=student,
-                image_data=image_data,
-                is_primary=is_primary
-            )
-
-            messages.success(request, 'Face enrolled successfully')
-            return redirect('student_detail', student_id=student.student_id)
+            if enrolled_count > 0:
+                messages.success(request, f'{enrolled_count} face image(s) enrolled successfully!')
+            if errors:
+                for err in errors:
+                    messages.error(request, err)
+            if enrolled_count > 0:
+                return redirect('student_detail', student_id=student.student_id)
 
         except Exception as e:
             logger.error(f"Error enrolling face: {str(e)}")
             messages.error(request, f'Error enrolling face: {str(e)}')
 
     context = {
-        'student': student,
+        'employee': student,
         'existing_encodings': student.face_encodings.count(),
     }
-    return render(request, 'attendance/face_enrollment.html', context)
+    return render(request, 'attendance/employee_face_enrollment.html', context)
 
 
 def class_list(request):
@@ -1250,23 +1334,16 @@ def api_recognize_face(request):
         today = timezone.now().date()
 
         # Get face recognition service
-        face_service = get_face_recognition_service()
-        if not face_service or not face_service.available:
-            return Response({
-                'success': False,
-                'message': 'Face recognition service not available. Please install DeepFace.'
-            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        # Use Face++ service (global instance)
 
         # Save the captured image for attendance record
         def save_attendance_image(image_data, student_id, class_id):
             """Save the captured image during attendance marking"""
             try:
-                import base64
                 from io import BytesIO
                 from PIL import Image
                 from django.core.files.base import ContentFile
                 from django.conf import settings
-                import os
 
                 # Create attendance images directory
                 attendance_images_dir = os.path.join(settings.MEDIA_ROOT, 'attendance_images')
@@ -1297,6 +1374,17 @@ def api_recognize_face(request):
             except Exception as e:
                 print(f"⚠️  Error saving attendance image: {str(e)}")
                 return None
+
+        # Validate image quality before recognition
+        is_valid, validation_message = face_service.validate_image_quality(image_data)
+        if not is_valid:
+            # Save the invalid image for debugging
+            save_attendance_image(image_data, 'invalid', class_id)
+            return Response({
+                'success': False,
+                'message': f'Image validation failed: {validation_message}',
+                'confidence': 0
+            }, status=status.HTTP_200_OK)
 
         # Recognize the student using face recognition
         recognized_student, confidence = face_service.recognize_student(image_data)
@@ -1424,12 +1512,7 @@ def api_validate_image(request):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Get face recognition service
-        face_service = get_face_recognition_service()
-        if not face_service or not face_service.available:
-            return Response({
-                'success': False,
-                'message': 'Face recognition service not available. Please install DeepFace.'
-            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        # Use Face++ service
 
         is_valid, message = face_service.validate_image_quality(image_data)
 
@@ -1439,11 +1522,14 @@ def api_validate_image(request):
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        logger.error(f"Error validating image: {str(e)}")
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Error validating image: {str(e)}\n{tb}")
         return Response({
             'success': False,
-            'message': f'Error validating image: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            'message': f'Error validating image: {str(e)}',
+            'traceback': tb
+        }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

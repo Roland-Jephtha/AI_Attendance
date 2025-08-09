@@ -28,6 +28,14 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+
+import os
+# import cloudinary_storage
+# import cloudinary
+# import cloudinary.uploader
+# import cloudinary.api
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -40,6 +48,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'attendance',
+    'cloudinary',
+    'cloudinary_storage'
+
 ]
 
 MIDDLEWARE = [
@@ -177,3 +188,18 @@ REST_FRAMEWORK = {
 # Face recognition settings
 FACE_RECOGNITION_THRESHOLD = 0.6
 FACE_ENCODINGS_DIR = BASE_DIR / 'media' / 'face_encodings'
+
+
+
+
+
+
+
+
+
+# CLOUDINARY_STORAGE ={
+#     'CLOUD_NAME': 'dx67lmaku',
+#     'API_KEY' : '223338436211385',
+#     'API_SECRET' : 'F-Iel3L-Kw1fHzy1xEhgkGunRPw',
+#     'API_PROXY' : "http://proxy.server:3128"
+# }

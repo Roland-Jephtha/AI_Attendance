@@ -8,7 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            {% comment %} background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); {% endcomment %}
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
@@ -152,9 +152,17 @@
                         <!-- Camera Section -->
                         <div class="col-md-8">
                             <div class="camera-section">
+                                
+                                       <!-- Back to Dashboard -->
+                                <a href="{% url 'lecturer_dashboard' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                                </a>
+
+                                <center>
                                 <h5 class="mb-3">
                                     <i class="fas fa-camera me-2"></i>Face Recognition Camera
                                 </h5>
+                                </center>
                                 
                                 <!-- Messages -->
                                 {% if messages %}
@@ -167,10 +175,10 @@
                                 {% endif %}
                                 
                                 <!-- Camera Display -->
-                                <div class="text-center mb-4">
+                                <div class="text-center mb-4" >
                                     <video id="video" width="100%" height="400" autoplay class="d-none"></video>
                                     <div id="cameraPlaceholder" class="d-flex align-items-center justify-content-center" 
-                                         style="width: 100%; height: 400px; background: #f8f9fa; border-radius: 15px; border: 2px dashed #dee2e6;">
+                                         style="width: 100%; height: 400px; background: #f8f9fa; border-radius: 15px; border: 2px dashed #dee2e6; ">
                                         <div class="text-center">
                                             <i class="fas fa-camera fa-3x text-muted mb-3"></i>
                                             <p class="text-muted">Click "Start Camera" to begin attendance</p>
@@ -198,10 +206,10 @@
                                 <!-- Instructions -->
                                 <div class="alert alert-info">
                                     <h6 class="alert-heading">
-                                        <i class="fas fa-info-circle me-2"></i>Instructions for Students:
+                                        <i class="fas fa-info-circle me-2"></i>Instructions for Employees:
                                     </h6>
                                     <ol class="mb-0">
-                                        <li>Wait for the lecturer to start the camera</li>
+                                        <li>Wait for the Supervisor to start the camera</li>
                                         <li>Position your face in the center of the camera</li>
                                         <li>Ensure good lighting on your face</li>
                                         <li>Click "Mark Attendance" when ready</li>
@@ -214,14 +222,14 @@
                         <!-- Student List Section -->
                         <div class="col-md-4">
                             <h5 class="mb-3">
-                                <i class="fas fa-users me-2"></i>Enrolled Students
+                                <i class="fas fa-users me-2"></i>Active Employees
                                 <span class="badge bg-primary ms-2">{{ today_attendance.count }}/{{ enrolled_students.count }}</span>
                             </h5>
 
                             {% if enrolled_students.count == 0 %}
                                 <div class="alert alert-info">
                                     <i class="fas fa-info-circle me-2"></i>
-                                    No students enrolled in this class yet.
+                                    No Employees Checked in this office yet.
                                 </div>
                             {% else %}
                                 <div style="max-height: 600px; overflow-y: auto;">
@@ -249,12 +257,7 @@
                                 </div>
                             {% endif %}
                             
-                            <!-- Back to Dashboard -->
-                            <div class="text-center mt-4">
-                                <a href="{% url 'lecturer_dashboard' %}" class="btn btn-outline-secondary">
-                                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                                </a>
-                            </div>
+                        
                         </div>
                     </div>
                 </div>
@@ -286,13 +289,16 @@
                 // Clear any previous captured image
                 clearCapturedImage();
                 
+
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { width: 640, height: 480 } 
                 });
                 video.srcObject = stream;
                 
+                
                 // Show video, hide placeholder
-                document.getElementById('cameraPlaceholder').style.display = 'none';
+                document.getElementById('cameraPlaceholder').remove();
+
                 video.classList.remove('d-none');
                 
                 // Update button states
@@ -309,6 +315,9 @@
 
         // Stop camera
         document.getElementById('stopCamera').addEventListener('click', function() {
+
+            window.location.reload();
+
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
@@ -326,8 +335,11 @@
             document.getElementById('startCamera').disabled = false;
             document.getElementById('markAttendance').disabled = true;
             this.disabled = true;
+
+            
             
             showStatus('Camera stopped.', 'info');
+
         });
 
         // Mark attendance (for any student)
